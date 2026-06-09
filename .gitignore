@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.env
+.env.*
+!.env.example
+wrangler.jsonc
+coverage/
+worker-configuration.d.ts
