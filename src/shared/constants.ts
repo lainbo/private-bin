@@ -22,6 +22,8 @@ export const LANGUAGE_OPTIONS = [
   { id: 'javascript', label: 'JavaScript' },
   { id: 'typescript', label: 'TypeScript' },
   { id: 'json', label: 'JSON' },
+  { id: 'markdown', label: 'Markdown' },
+  { id: 'yaml', label: 'YAML' },
   { id: 'css', label: 'CSS' },
   { id: 'html', label: 'HTML' },
   { id: 'shell', label: 'Shell' },

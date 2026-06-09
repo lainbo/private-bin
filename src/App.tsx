@@ -4,6 +4,7 @@ import {
   Check,
   Clock,
   Copy,
+  Download,
   Eye,
   EyeOff,
   Flame,
@@ -16,8 +17,19 @@ import {
   UserRound,
   UsersRound,
 } from 'lucide-react';
-import { FormEvent, useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import {
+  FormEvent,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
 import type { ReactNode } from 'react';
+import type { EditorProps } from '@monaco-editor/react';
 import type { ApiUser, AuthStatusResponse, PasteResponse } from './shared/api-types';
 import {
   DEFAULT_EXPIRATION_ID,
@@ -55,6 +67,57 @@ type CreatedPaste = {
   expiresAt: number;
   burnAfterReading: boolean;
   requiresPassword: boolean;
+};
+
+const MonacoEditor = lazy(async () => {
+  await import('./lib/monaco');
+  const module = await import('@monaco-editor/react');
+  return { default: module.default };
+});
+
+const MONACO_EDITOR_OPTIONS = {
+  automaticLayout: true,
+  detectIndentation: true,
+  fixedOverflowWidgets: true,
+  fontFamily: '"JetBrains Mono","HarmonyOS Sans SC","Cascadia Code","Consolas","Menlo","Twemoji Mozilla","monospace"',
+  fontSize: 20,
+  minimap: { enabled: false },
+  padding: { top: 24, bottom: 24 },
+  renderLineHighlight: 'line',
+  scrollBeyondLastLine: false,
+  tabSize: 2,
+  wordWrap: 'on',
+} satisfies EditorProps['options'];
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window === 'undefined' ? false : window.matchMedia(query).matches,
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const updateMatches = () => setMatches(media.matches);
+    updateMatches();
+    media.addEventListener('change', updateMatches);
+    return () => media.removeEventListener('change', updateMatches);
+  }, [query]);
+
+  return matches;
+}
+
+const DOWNLOAD_EXTENSION_BY_LANGUAGE: Record<PasteLanguage, string> = {
+  text: 'txt',
+  javascript: 'js',
+  typescript: 'ts',
+  json: 'json',
+  markdown: 'md',
+  yaml: 'yaml',
+  css: 'css',
+  html: 'html',
+  shell: 'sh',
+  python: 'py',
+  go: 'go',
+  rust: 'rs',
 };
 
 function currentRoute(): Route {
@@ -109,41 +172,49 @@ function AuthGate({
   }
 
   return (
-    <section className="auth-panel panel">
-      <div className="panel-heading">
-        <KeyRound size={18} />
-        <h2>创建需要 passkey</h2>
+    <section className="card p-6 sm:p-7 grid gap-4">
+      <div className="flex items-center gap-2.5">
+        <KeyRound size={18} className="text-primary" />
+        <h2 className="text-[21px] font-semibold tracking-[-0.2px]">创建需要 passkey</h2>
       </div>
       {!supported ? (
-        <p className="notice danger">
-          当前浏览器不支持 WebAuthn/passkey。请换用支持 passkey 的浏览器或启用 Bitwarden
-          扩展。
+        <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
+          当前浏览器不支持 WebAuthn/passkey。请换用支持 passkey 的浏览器或启用 Bitwarden 扩展。
         </p>
       ) : null}
-      <button className="button primary" type="button" disabled={!supported || busy} onClick={submitLogin}>
+      <button className="btn-pill w-full" type="button" disabled={!supported || busy} onClick={submitLogin}>
         <KeyRound size={18} />
         使用 passkey 登录
       </button>
       {status.registrationOpen ? (
-        <form className="register-form" onSubmit={submitRegister}>
-          <label>
+        <form className="grid gap-3 border-t border-divider-soft pt-4" onSubmit={submitRegister}>
+          <label className="grid gap-1.5 text-[13px] font-semibold text-ink-48">
             注册名称
             <input
+              className="field"
               value={displayName}
               maxLength={64}
               placeholder="例如 Owen"
               onChange={(event) => setDisplayName(event.target.value)}
             />
           </label>
-          <button className="button secondary" type="submit" disabled={!supported || busy || !displayName.trim()}>
+          <button
+            className="btn-ghost w-full"
+            type="submit"
+            disabled={!supported || busy || !displayName.trim()}
+          >
             <UserRound size={18} />
             注册新的 passkey
           </button>
         </form>
       ) : (
-        <p className="notice">注册目前关闭。已注册用户可以继续登录创建。</p>
+        <p className="text-[14px] text-ink-48">注册目前关闭。已注册用户可以继续登录创建。</p>
       )}
-      {message ? <p className="notice danger">{message}</p> : null}
+      {message ? (
+        <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
+          {message}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -170,25 +241,37 @@ function TopBar({
   }
 
   return (
-    <header className="topbar">
-      <button className="brand" type="button" onClick={goHome}>
-        <ShieldCheck size={22} />
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-hairline bg-[color-mix(in_srgb,var(--color-parchment)_82%,transparent)] px-4 py-3 backdrop-blur-xl backdrop-saturate-150 sm:px-8">
+      <button
+        className="inline-flex items-center gap-2 bg-transparent text-[17px] font-semibold tracking-[-0.3px] cursor-pointer"
+        type="button"
+        onClick={goHome}
+      >
+        <ShieldCheck size={20} className="text-primary" />
         <span>Private Bin</span>
       </button>
-      <nav className="top-actions" aria-label="主要操作">
+      <nav className="flex items-center gap-2.5" aria-label="主要操作">
         {route.name === 'paste' ? (
-          <button className="button ghost" type="button" onClick={goHome}>
+          <button className="btn-utility" type="button" onClick={goHome}>
             新建
           </button>
         ) : null}
         {status?.authenticated && status.user ? (
           <>
-            <span className="user-pill" title={status.user.role === 'admin' ? '管理员' : '普通用户'}>
-              <UserRound size={15} />
+            <span
+              className="hidden items-center gap-1.5 rounded-pill border border-hairline bg-canvas px-3 py-1.5 text-[14px] text-ink-80 sm:inline-flex"
+              title={status.user.role === 'admin' ? '管理员' : '普通用户'}
+            >
+              <UserRound size={15} className="text-ink-48" />
               {status.user.displayName}
             </span>
-            <button className="icon-button" type="button" title="退出登录" onClick={submitLogout}>
-              <LogOut size={18} />
+            <button
+              className="inline-flex h-9 w-9 items-center justify-center rounded-pill border border-hairline bg-canvas text-ink-80 transition-transform active:scale-95"
+              type="button"
+              title="退出登录"
+              onClick={submitLogout}
+            >
+              <LogOut size={17} />
             </button>
           </>
         ) : null}
@@ -214,6 +297,7 @@ function Home({
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const shareCardRef = useRef<HTMLElement | null>(null);
   const textSize = useMemo(() => utf8ByteLength(text), [text]);
   const selectedExpiration = EXPIRATION_OPTIONS.find((option) => option.id === expirationId) ?? EXPIRATION_OPTIONS[4];
 
@@ -269,26 +353,59 @@ function Home({
     setCopied(true);
   }
 
+  const updateText = useCallback((value: string | undefined) => {
+    setText(value ?? '');
+  }, []);
+  const isCompactEditor = useMediaQuery('(max-width: 640px)');
+  const editorOptions = useMemo(
+    () => ({
+      ...MONACO_EDITOR_OPTIONS,
+      fontSize: isCompactEditor ? 16 : 20,
+    }),
+    [isCompactEditor],
+  );
+
+  useEffect(() => {
+    if (!created) return;
+    const frame = window.requestAnimationFrame(() => {
+      shareCardRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [created?.id]);
+
   return (
-    <main className="workspace">
-      <section className="editor-area">
-        <div className="headline">
-          <p>零知识纯文字传输</p>
-          <h1>写下内容，加密后分享。</h1>
-        </div>
+    <main className={status.authenticated ? 'create-workspace' : 'create-workspace create-workspace--auth'}>
+      <section className="create-editor-area">
         {status.authenticated ? (
-          <form className="composer" onSubmit={onSubmit}>
-            <textarea
-              value={text}
-              spellCheck={false}
-              placeholder="粘贴文字、日志、代码片段..."
-              onChange={(event) => setText(event.target.value)}
-            />
-            <div className="composer-footer">
-              <span className={textSize > MAX_TEXT_BYTES ? 'size over' : 'size'}>
+          <form className="editor-form card" onSubmit={onSubmit}>
+            <div className="editor-shell">
+              <Suspense fallback={<div className="editor-loading">正在加载编辑器...</div>}>
+                <MonacoEditor
+                  height="100%"
+                  width="100%"
+                  language="plaintext"
+                  theme="vs"
+                  value={text}
+                  options={editorOptions}
+                  loading={<div className="editor-loading">正在加载编辑器...</div>}
+                  onChange={updateText}
+                />
+              </Suspense>
+            </div>
+            <div className="editor-statusbar">
+              <span
+                className={
+                  textSize > MAX_TEXT_BYTES
+                    ? 'text-[14px] font-semibold text-[#b84a3b]'
+                    : 'text-[14px] text-ink-48'
+                }
+              >
                 {formatBytes(textSize)} / {formatBytes(MAX_TEXT_BYTES)}
               </span>
-              <button className="button primary" type="submit" disabled={isPending || textSize === 0}>
+              <button className="btn-pill" type="submit" disabled={isPending || textSize === 0}>
                 <Send size={18} />
                 {isPending ? '加密中' : '生成链接'}
               </button>
@@ -300,15 +417,19 @@ function Home({
       </section>
 
       {status.authenticated ? (
-        <aside className="control-area">
-          <section className="panel controls-panel">
-            <div className="panel-heading">
-              <Clock size={18} />
+        <aside className="create-sidebar">
+          <section className="card sidebar-panel">
+            <div className="sidebar-title">
+              <Clock size={18} className="text-primary" />
               <h2>选项</h2>
             </div>
-            <label>
+            <label className="grid gap-1.5 text-[13px] font-semibold text-ink-48">
               过期时间
-              <select value={expirationId} onChange={(event) => setExpirationId(event.target.value as ExpirationId)}>
+              <select
+                className="field"
+                value={expirationId}
+                onChange={(event) => setExpirationId(event.target.value as ExpirationId)}
+              >
                 {EXPIRATION_OPTIONS.map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.label}
@@ -316,9 +437,13 @@ function Home({
                 ))}
               </select>
             </label>
-            <label>
+            <label className="grid gap-1.5 text-[13px] font-semibold text-ink-48">
               代码高亮
-              <select value={language} onChange={(event) => setLanguage(event.target.value as PasteLanguage)}>
+              <select
+                className="field"
+                value={language}
+                onChange={(event) => setLanguage(event.target.value as PasteLanguage)}
+              >
                 {LANGUAGE_OPTIONS.map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.label}
@@ -326,17 +451,18 @@ function Home({
                 ))}
               </select>
             </label>
-            <label className="password-field">
+            <label className="grid gap-1.5 text-[13px] font-semibold text-ink-48">
               查看密码
-              <span>
+              <span className="relative block">
                 <input
+                  className="field pr-11"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   placeholder="可留空"
                   onChange={(event) => setPassword(event.target.value)}
                 />
                 <button
-                  className="icon-button"
+                  className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-ink-48 transition-colors hover:text-ink"
                   type="button"
                   title={showPassword ? '隐藏密码' : '显示密码'}
                   onClick={() => setShowPassword((value) => !value)}
@@ -345,45 +471,60 @@ function Home({
                 </button>
               </span>
             </label>
-            <label className="toggle">
+            <label className="flex items-center gap-3 text-[15px] text-ink">
               <input
+                className="h-[18px] w-[18px] accent-primary"
                 type="checkbox"
                 checked={burnAfterReading}
                 onChange={(event) => setBurnAfterReading(event.target.checked)}
               />
-              <span>
-                <Flame size={17} />
+              <span className="inline-flex items-center gap-2">
+                <Flame size={17} className="text-primary" />
                 阅后即焚
               </span>
             </label>
           </section>
 
-          {message ? <p className="notice danger">{message}</p> : null}
+          {message ? (
+            <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
+              {message}
+            </p>
+          ) : null}
 
           {created ? (
-            <section className="panel result-panel">
-              <div className="panel-heading">
-                <QrCode size={18} />
+            <section className="card sidebar-panel" ref={shareCardRef}>
+              <div className="sidebar-title">
+                <QrCode size={18} className="text-primary" />
                 <h2>分享</h2>
               </div>
-              <img className="qr" src={created.qrDataUrl} alt="分享二维码" />
-              <div className="link-box">{created.url}</div>
-              <button className="button secondary" type="button" onClick={copyLink}>
+              <img
+                className="mx-auto block w-[min(224px,100%)] rounded-md border border-hairline"
+                src={created.qrDataUrl}
+                alt="分享二维码"
+              />
+              <div className="share-url" title={created.url}>
+                {created.url}
+              </div>
+              <button className="btn-ghost w-full" type="button" onClick={copyLink}>
                 {copied ? <Check size={18} /> : <Copy size={18} />}
                 {copied ? '已复制' : '复制链接'}
               </button>
-              <dl className="facts">
-                <div>
-                  <dt>过期</dt>
-                  <dd>{formatDateTime(created.expiresAt)}</dd>
+              <dl className="grid gap-0">
+                <div className="flex items-center justify-between gap-4 border-t border-divider-soft py-2.5">
+                  <dt className="text-[13px] text-ink-48">过期</dt>
+                  <dd className="m-0 text-[14px] font-semibold">{formatDateTime(created.expiresAt)}</dd>
                 </div>
-                <div>
-                  <dt>密码</dt>
-                  <dd>{created.requiresPassword ? '已启用' : '未设置'}</dd>
+                <div className="flex items-center justify-between gap-4 border-t border-divider-soft py-2.5">
+                  <dt className="text-[13px] text-ink-48">密码</dt>
+                  <dd className="m-0 text-[14px] font-semibold">
+                    {created.requiresPassword ? '已启用' : '未设置'}
+                  </dd>
                 </div>
-                <div>
-                  <dt>阅后即焚</dt>
-                  <dd>{created.burnAfterReading ? '已启用' : '关闭'}</dd>
+                <div className="flex items-center justify-between gap-4 border-t border-divider-soft py-2.5">
+                  <dt className="text-[13px] text-ink-48">阅后即焚</dt>
+                  <dd className="m-0 text-[14px] font-semibold">
+                    {created.burnAfterReading ? '已启用' : '关闭'}
+                  </dd>
                 </div>
               </dl>
             </section>
@@ -426,21 +567,30 @@ function AdminPanel({ currentUser }: { currentUser: ApiUser }) {
   }
 
   return (
-    <section className="panel admin-panel">
-      <button className="section-toggle" type="button" onClick={() => setOpen((value) => !value)}>
-        <UsersRound size={18} />
+    <section className="card grid gap-3 p-6">
+      <button
+        className="inline-flex items-center gap-2.5 bg-transparent text-left text-[17px] font-semibold tracking-[-0.3px]"
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <UsersRound size={18} className="text-primary" />
         用户管理
       </button>
       {open ? (
-        <div className="user-list">
+        <div className="grid gap-2">
           {users.map((user) => (
-            <div className="user-row" key={user.id}>
-              <span>
-                <strong>{user.displayName}</strong>
-                <small>{user.role === 'admin' ? '管理员' : '用户'}</small>
+            <div
+              className="flex items-center justify-between gap-3 border-t border-divider-soft pt-2.5"
+              key={user.id}
+            >
+              <span className="grid min-w-0">
+                <strong className="truncate text-[15px] font-semibold">{user.displayName}</strong>
+                <small className="truncate text-[13px] text-ink-48">
+                  {user.role === 'admin' ? '管理员' : '用户'}
+                </small>
               </span>
               <button
-                className="button compact"
+                className="inline-flex h-8 items-center rounded-pill border border-hairline bg-canvas px-3.5 text-[13px] font-medium text-ink transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                 type="button"
                 disabled={user.id === currentUser.id}
                 onClick={() => toggleUser(user)}
@@ -449,7 +599,11 @@ function AdminPanel({ currentUser }: { currentUser: ApiUser }) {
               </button>
             </div>
           ))}
-          {message ? <p className="notice danger">{message}</p> : null}
+          {message ? (
+            <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
+              {message}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -533,7 +687,7 @@ function ViewPaste({ id }: { id: string }) {
         title="这是阅后即焚 Paste"
         message="打开后服务端会立即删除它。确认周围环境安全后再继续。"
       >
-        <button className="button primary" type="button" onClick={() => setConfirmed(true)}>
+        <button className="btn-pill" type="button" onClick={() => setConfirmed(true)}>
           <Flame size={18} />
           现在打开
         </button>
@@ -542,63 +696,64 @@ function ViewPaste({ id }: { id: string }) {
   }
 
   return (
-    <main className="reader">
-      <section className="reader-head">
-        <div>
-          <p>Paste</p>
-          <h1>{id}</h1>
-        </div>
-        {paste ? (
-          <dl className="reader-meta">
-            <div>
-              <dt>剩余</dt>
-              <dd>{formatRelativeSeconds(paste.timeToLiveSeconds)}</dd>
-            </div>
-            <div>
-              <dt>密码</dt>
-              <dd>{paste.requiresPassword ? '需要' : '无'}</dd>
-            </div>
-            <div>
-              <dt>阅后即焚</dt>
-              <dd>{paste.burnAfterReading ? '是' : '否'}</dd>
-            </div>
-          </dl>
-        ) : null}
-      </section>
-      {loading ? <p className="notice">正在读取密文...</p> : null}
+    <main className="paste-view-shell">
+      {paste ? (
+        <dl className="paste-meta-strip" aria-label="Paste 信息">
+          <div>
+            <dt>剩余</dt>
+            <dd>{formatRelativeSeconds(paste.timeToLiveSeconds)}</dd>
+          </div>
+          <div>
+            <dt>密码</dt>
+            <dd>{paste.requiresPassword ? '需要' : '无'}</dd>
+          </div>
+          <div>
+            <dt>阅后即焚</dt>
+            <dd>{paste.burnAfterReading ? '是' : '否'}</dd>
+          </div>
+        </dl>
+      ) : null}
+      {loading ? <p className="paste-inline-state">正在读取密文...</p> : null}
       {needsPassword ? (
-        <form className="panel password-prompt" onSubmit={submitPassword}>
-          <div className="panel-heading">
-            <KeyRound size={18} />
-            <h2>需要查看密码</h2>
+        <form className="card paste-password-panel" onSubmit={submitPassword}>
+          <div className="flex items-center gap-2.5">
+            <KeyRound size={18} className="text-primary" />
+            <h2 className="text-[21px] font-semibold tracking-[-0.2px]">需要查看密码</h2>
           </div>
           <input
+            className="field"
             autoFocus
             type="password"
             value={password}
             placeholder="输入创建者另行告知的密码"
             onChange={(event) => setPassword(event.target.value)}
           />
-          <button className="button primary" type="submit" disabled={!password}>
+          <button className="btn-pill w-full" type="submit" disabled={!password}>
             解密
           </button>
         </form>
       ) : null}
       {message ? (
-        <p className="notice danger">
+        <p className="paste-error">
           <AlertTriangle size={18} />
           {message}
         </p>
       ) : null}
-      {plainText && paste ? <CodeViewer text={plainText} language={paste.language} /> : null}
+      {plainText && paste ? <CodeViewer id={id} text={plainText} language={paste.language} /> : null}
     </main>
   );
 }
 
-function CodeViewer({ text, language }: { text: string; language: PasteLanguage }) {
+function CodeViewer({ id, text, language }: { id: string; text: string; language: PasteLanguage }) {
   const [html, setHtml] = useState('');
   const [highlighting, setHighlighting] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const canHighlight = language !== 'text' && utf8ByteLength(text) <= HIGHLIGHT_BYTE_LIMIT;
+  const languageLabel = LANGUAGE_OPTIONS.find((option) => option.id === language)?.label ?? '纯文本';
+  const downloadName = useMemo(() => {
+    const extension = DOWNLOAD_EXTENSION_BY_LANGUAGE[language] ?? 'txt';
+    return `private-bin-${id}.${extension}`;
+  }, [id, language]);
 
   useEffect(() => {
     if (!canHighlight) {
@@ -623,17 +778,54 @@ function CodeViewer({ text, language }: { text: string; language: PasteLanguage 
     };
   }, [canHighlight, language, text]);
 
+  async function copyText() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyState('copied');
+    } catch {
+      setCopyState('failed');
+    }
+  }
+
+  function downloadText() {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = downloadName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   return (
-    <section className="viewer">
+    <section className="viewer-shell">
       <div className="viewer-toolbar">
-        <span>{LANGUAGE_OPTIONS.find((option) => option.id === language)?.label ?? '纯文本'}</span>
-        {highlighting ? <span>高亮加载中</span> : null}
-        {!canHighlight && language !== 'text' ? <span>文本较大，已使用纯文本显示</span> : null}
+        <div className="viewer-toolbar-info">
+          <span className="font-semibold text-ink-80">{languageLabel}</span>
+          {highlighting ? <span>高亮加载中</span> : null}
+          {!canHighlight && language !== 'text' ? <span>文本较大，已使用纯文本显示</span> : null}
+        </div>
+        <div className="viewer-actions">
+          <button className="viewer-action-btn" type="button" onClick={copyText}>
+            {copyState === 'copied' ? <Check size={16} /> : <Copy size={16} />}
+            {copyState === 'copied' ? '已复制' : copyState === 'failed' ? '复制失败' : '复制内容'}
+          </button>
+          <button className="viewer-action-btn" type="button" onClick={downloadText}>
+            <Download size={16} />
+            下载
+          </button>
+        </div>
       </div>
       {html ? (
-        <div className="highlighted" dangerouslySetInnerHTML={{ __html: html }} />
+        <div
+          className="highlighted viewer-code"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
       ) : (
-        <pre className="plain-text">{text}</pre>
+        <pre className="viewer-code-plain">
+          {text}
+        </pre>
       )}
     </section>
   );
@@ -649,13 +841,13 @@ function CenteredNotice({
   children?: ReactNode;
 }) {
   return (
-    <main className="centered">
-      <section className="panel centered-panel">
-        <div className="panel-heading">
-          <AlertTriangle size={18} />
-          <h1>{title}</h1>
+    <main className="grid min-h-[calc(100dvh-70px)] place-items-center p-6">
+      <section className="card grid w-[min(480px,100%)] gap-3 p-6 sm:p-7">
+        <div className="flex items-center gap-2.5">
+          <AlertTriangle size={18} className="text-primary" />
+          <h1 className="text-[21px] font-semibold tracking-[-0.2px]">{title}</h1>
         </div>
-        <p>{message}</p>
+        <p className="m-0 text-[15px] leading-[1.5] text-ink-48">{message}</p>
         {children}
       </section>
     </main>
@@ -685,18 +877,22 @@ export default function App() {
   }, [refreshAuth]);
 
   return (
-    <>
+    <div className={route.name === 'paste' ? 'app-shell app-shell--paste' : 'app-shell'}>
       <TopBar status={status} refresh={refreshAuth} route={route} setRoute={setRoute} />
-      {message ? <p className="global-error">{message}</p> : null}
+      {message ? (
+        <p className="mx-4 mt-3.5 rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b] sm:mx-8">
+          {message}
+        </p>
+      ) : null}
       {route.name === 'paste' ? (
         <ViewPaste id={route.id} />
       ) : status ? (
         <Home status={status} refreshAuth={refreshAuth} />
       ) : (
-        <main className="centered">
-          <RefreshCcw className="spin" size={24} />
+        <main className="grid min-h-[calc(100dvh-70px)] place-items-center p-6">
+          <RefreshCcw className="spin text-ink-48" size={24} />
         </main>
       )}
-    </>
+    </div>
   );
 }

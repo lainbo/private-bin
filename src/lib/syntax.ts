@@ -6,6 +6,8 @@ type SupportedLanguage =
   | 'javascript'
   | 'typescript'
   | 'json'
+  | 'markdown'
+  | 'yaml'
   | 'css'
   | 'html'
   | 'bash'
@@ -20,6 +22,8 @@ const LANGUAGE_MAP: Record<PasteLanguage, SupportedLanguage | 'text'> = {
   javascript: 'javascript',
   typescript: 'typescript',
   json: 'json',
+  markdown: 'markdown',
+  yaml: 'yaml',
   css: 'css',
   html: 'html',
   shell: 'bash',
@@ -37,6 +41,8 @@ function getHighlighter(): Promise<HighlighterCore> {
         import('shiki/dist/langs/javascript.mjs'),
         import('shiki/dist/langs/typescript.mjs'),
         import('shiki/dist/langs/json.mjs'),
+        import('shiki/dist/langs/markdown.mjs'),
+        import('shiki/dist/langs/yaml.mjs'),
         import('shiki/dist/langs/css.mjs'),
         import('shiki/dist/langs/html.mjs'),
         import('shiki/dist/langs/bash.mjs'),
