@@ -18,7 +18,6 @@ import {
   UsersRound,
 } from 'lucide-react';
 import {
-  FormEvent,
   lazy,
   Suspense,
   useCallback,
@@ -28,7 +27,7 @@ import {
   useState,
   useTransition,
 } from 'react';
-import type { ReactNode } from 'react';
+import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import type { EditorProps } from '@monaco-editor/react';
 import type { ApiUser, AuthStatusResponse, PasteResponse } from './shared/api-types';
 import {
@@ -356,6 +355,9 @@ function Home({
   const updateText = useCallback((value: string | undefined) => {
     setText(value ?? '');
   }, []);
+  const updateTextareaText = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
+    updateText(event.currentTarget.value);
+  }, [updateText]);
   const isCompactEditor = useMediaQuery('(max-width: 640px)');
   const editorOptions = useMemo(
     () => ({
@@ -382,18 +384,28 @@ function Home({
         {status.authenticated ? (
           <form className="editor-form card" onSubmit={onSubmit}>
             <div className="editor-shell">
-              <Suspense fallback={<div className="editor-loading">正在加载编辑器...</div>}>
-                <MonacoEditor
-                  height="100%"
-                  width="100%"
-                  language="plaintext"
-                  theme="vs"
+              {isCompactEditor ? (
+                <textarea
+                  className="mobile-editor-textarea"
+                  aria-label="粘贴内容"
                   value={text}
-                  options={editorOptions}
-                  loading={<div className="editor-loading">正在加载编辑器...</div>}
-                  onChange={updateText}
+                  spellCheck={false}
+                  onChange={updateTextareaText}
                 />
-              </Suspense>
+              ) : (
+                <Suspense fallback={<div className="editor-loading">正在加载编辑器...</div>}>
+                  <MonacoEditor
+                    height="100%"
+                    width="100%"
+                    language="plaintext"
+                    theme="vs"
+                    value={text}
+                    options={editorOptions}
+                    loading={<div className="editor-loading">正在加载编辑器...</div>}
+                    onChange={updateText}
+                  />
+                </Suspense>
+              )}
             </div>
             <div className="editor-statusbar">
               <span
