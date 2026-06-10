@@ -76,3 +76,12 @@ export type PasteResponse = {
 export type AdminUserResponse = {
   users: ApiUser[];
 };
+
+export type AdminUpdateUserRequest = {
+  displayName?: string;
+  disabled?: boolean;
+};
+
+export type AdminDeleteUserRequest = {
+  confirmDisplayName: string;
+};

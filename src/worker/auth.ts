@@ -10,7 +10,12 @@ import type {
   RegistrationResponseJSON,
   WebAuthnCredential,
 } from '@simplewebauthn/server';
-import type { AdminUserResponse, AuthStatusResponse } from '../shared/api-types';
+import type {
+  AdminDeleteUserRequest,
+  AdminUpdateUserRequest,
+  AdminUserResponse,
+  AuthStatusResponse,
+} from '../shared/api-types';
 import { base64urlToBytes, bytesToBase64url } from '../lib/base64url';
 import { clearSessionCookie, parseCookies, sessionCookie } from './cookies';
 import { countUsers, getUserById, toApiUser, type CredentialRow, type UserRow } from './db';
@@ -55,6 +60,29 @@ function validateDisplayName(value: unknown): string {
     throw new HttpError(400, '注册名称需要在 1 到 64 个字符之间。');
   }
   return displayName;
+}
+
+function assertJsonObject(value: unknown): asserts value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new HttpError(400, '请求内容不正确。');
+  }
+}
+
+async function countActiveAdmins(env: AppEnv): Promise<number> {
+  const row = await env.DB.prepare(
+    'SELECT COUNT(*) AS count FROM users WHERE role = ? AND disabled = 0',
+  )
+    .bind('admin')
+    .first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+async function assertCanRemoveActiveAdmin(env: AppEnv, user: UserRow): Promise<void> {
+  if (user.role !== 'admin' || user.disabled === 1) return;
+  const activeAdminCount = await countActiveAdmins(env);
+  if (activeAdminCount <= 1) {
+    throw new HttpError(400, '不能移除最后一个管理员。');
+  }
 }
 
 async function createSession(env: AppEnv, userId: string, request: Request): Promise<Headers> {
@@ -288,13 +316,62 @@ export async function adminUsers(env: AppEnv, request: Request): Promise<Respons
 
 export async function updateAdminUser(env: AppEnv, request: Request, userId: string): Promise<Response> {
   const auth = await requireAdmin(env, request);
-  if (auth.user.id === userId) throw new HttpError(400, '不能停用当前登录的管理员。');
-  const body = await readJson<{ disabled?: unknown }>(request);
-  if (typeof body.disabled !== 'boolean') throw new HttpError(400, '用户状态不正确。');
+  const body = await readJson<AdminUpdateUserRequest>(request);
+  assertJsonObject(body);
   const user = await getUserById(env, userId);
   if (!user) throw new HttpError(404, '用户不存在。');
-  await env.DB.prepare('UPDATE users SET disabled = ?, updated_at = ? WHERE id = ?')
-    .bind(body.disabled ? 1 : 0, Date.now(), userId)
-    .run();
+
+  const updates: string[] = [];
+  const values: Array<string | number> = [];
+
+  if ('displayName' in body) {
+    updates.push('display_name = ?');
+    values.push(validateDisplayName(body.displayName));
+  }
+
+  if ('disabled' in body) {
+    if (typeof body.disabled !== 'boolean') throw new HttpError(400, '用户状态不正确。');
+    if (auth.user.id === userId && body.disabled) {
+      throw new HttpError(400, '不能停用当前登录的管理员。');
+    }
+    if (body.disabled) await assertCanRemoveActiveAdmin(env, user);
+    updates.push('disabled = ?');
+    values.push(body.disabled ? 1 : 0);
+  }
+
+  if (updates.length === 0) throw new HttpError(400, '没有可更新的用户字段。');
+
+  updates.push('updated_at = ?');
+  values.push(Date.now(), userId);
+
+  await env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
+  return jsonResponse({ ok: true });
+}
+
+export async function forceLogoutAdminUser(env: AppEnv, request: Request, userId: string): Promise<Response> {
+  await requireAdmin(env, request);
+  const user = await getUserById(env, userId);
+  if (!user) throw new HttpError(404, '用户不存在。');
+  await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
+  return jsonResponse({ ok: true });
+}
+
+export async function deleteAdminUser(env: AppEnv, request: Request, userId: string): Promise<Response> {
+  await requireAdmin(env, request);
+  const body = await readJson<AdminDeleteUserRequest>(request);
+  assertJsonObject(body);
+  const user = await getUserById(env, userId);
+  if (!user) throw new HttpError(404, '用户不存在。');
+  if (typeof body.confirmDisplayName !== 'string' || body.confirmDisplayName !== user.display_name) {
+    throw new HttpError(400, '请输入完整用户名确认删除。');
+  }
+  await assertCanRemoveActiveAdmin(env, user);
+
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM pastes WHERE owner_user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM passkey_credentials WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId),
+  ]);
   return jsonResponse({ ok: true });
 }

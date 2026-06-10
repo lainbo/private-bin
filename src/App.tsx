@@ -10,6 +10,8 @@ import {
   Flame,
   KeyRound,
   LogOut,
+  Pencil,
+  Trash2,
   QrCode,
   RefreshCcw,
   Send,
@@ -41,10 +43,13 @@ import {
 } from './shared/constants';
 import {
   createPaste,
+  deleteAdminUser,
+  forceLogoutAdminUser,
   getAdminUsers,
   getAuthStatus,
   getPaste,
   setUserDisabled,
+  updateAdminUser,
 } from './lib/api';
 import { ApiError } from './lib/http';
 import {
@@ -601,16 +606,23 @@ function AdminPage({
             <h1>用户管理</h1>
           </div>
         </div>
-        <AdminPanel currentUser={status.user} />
+        <AdminPanel currentUser={status.user} refreshAuth={refreshAuth} />
       </section>
     </main>
   );
 }
 
-function AdminPanel({ currentUser }: { currentUser: ApiUser }) {
+function AdminPanel({
+  currentUser,
+  refreshAuth,
+}: {
+  currentUser: ApiUser;
+  refreshAuth: () => Promise<void>;
+}) {
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const activeAdminCount = users.filter((user) => user.role === 'admin' && !user.disabled).length;
 
   const loadUsers = useCallback(async () => {
     setMessage('');
@@ -639,6 +651,47 @@ function AdminPanel({ currentUser }: { currentUser: ApiUser }) {
     }
   }
 
+  async function renameUser(user: ApiUser, displayName: string) {
+    setMessage('');
+    try {
+      await updateAdminUser(user.id, { displayName });
+      await loadUsers();
+      if (user.id === currentUser.id) await refreshAuth();
+    } catch (error) {
+      setMessage(errorMessage(error));
+      throw error;
+    }
+  }
+
+  async function forceLogoutUser(user: ApiUser) {
+    setMessage('');
+    try {
+      await forceLogoutAdminUser(user.id);
+      if (user.id === currentUser.id) {
+        await refreshAuth();
+        return;
+      }
+      await loadUsers();
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function removeUser(user: ApiUser, confirmDisplayName: string) {
+    setMessage('');
+    try {
+      await deleteAdminUser(user.id, { confirmDisplayName });
+      if (user.id === currentUser.id) {
+        await refreshAuth();
+        return;
+      }
+      await loadUsers();
+    } catch (error) {
+      setMessage(errorMessage(error));
+      throw error;
+    }
+  }
+
   return (
     <section className="card admin-panel">
       {loading ? (
@@ -646,23 +699,16 @@ function AdminPanel({ currentUser }: { currentUser: ApiUser }) {
       ) : null}
       <div className="admin-user-list">
         {users.map((user) => (
-          <div className="admin-user-row" key={user.id}>
-            <span className="grid min-w-0">
-              <strong>{user.displayName}</strong>
-              <small>
-                {user.role === 'admin' ? '管理员' : '用户'}
-                {user.disabled ? ' · 已停用' : ''}
-              </small>
-            </span>
-            <button
-              className="admin-user-action"
-              type="button"
-              disabled={user.id === currentUser.id}
-              onClick={() => toggleUser(user)}
-            >
-              {user.disabled ? '启用' : '停用'}
-            </button>
-          </div>
+          <AdminUserRow
+            key={user.id}
+            user={user}
+            isCurrentUser={user.id === currentUser.id}
+            isLastActiveAdmin={user.role === 'admin' && !user.disabled && activeAdminCount <= 1}
+            onToggleDisabled={toggleUser}
+            onRename={renameUser}
+            onForceLogout={forceLogoutUser}
+            onDelete={removeUser}
+          />
         ))}
       </div>
       {!loading && users.length === 0 && !message ? (
@@ -674,6 +720,193 @@ function AdminPanel({ currentUser }: { currentUser: ApiUser }) {
         </p>
       ) : null}
     </section>
+  );
+}
+
+function AdminUserRow({
+  user,
+  isCurrentUser,
+  isLastActiveAdmin,
+  onToggleDisabled,
+  onRename,
+  onForceLogout,
+  onDelete,
+}: {
+  user: ApiUser;
+  isCurrentUser: boolean;
+  isLastActiveAdmin: boolean;
+  onToggleDisabled: (user: ApiUser) => Promise<void>;
+  onRename: (user: ApiUser, displayName: string) => Promise<void>;
+  onForceLogout: (user: ApiUser) => Promise<void>;
+  onDelete: (user: ApiUser, confirmDisplayName: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [nextName, setNextName] = useState(user.displayName);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setNextName(user.displayName);
+  }, [user.displayName]);
+
+  async function submitRename(event: FormEvent) {
+    event.preventDefault();
+    const displayName = nextName.trim();
+    if (!displayName || displayName === user.displayName) {
+      setEditing(false);
+      setNextName(user.displayName);
+      return;
+    }
+    setBusy(true);
+    try {
+      await onRename(user, displayName);
+      setEditing(false);
+    } catch {
+      // 父组件已经展示错误信息，这里只保持编辑态方便修正。
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitDelete(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await onDelete(user, deleteConfirmation);
+      setConfirmingDelete(false);
+      setDeleteConfirmation('');
+    } catch {
+      // 父组件已经展示错误信息，这里保留输入，避免用户重输。
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitForceLogout() {
+    setBusy(true);
+    try {
+      await onForceLogout(user);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canDelete = !isLastActiveAdmin;
+  const canDisable = !isCurrentUser && !(user.role === 'admin' && !user.disabled && isLastActiveAdmin);
+
+  return (
+    <div className="admin-user-row">
+      <div className="admin-user-main">
+        {editing ? (
+          <form className="admin-inline-form" onSubmit={submitRename}>
+            <input
+              className="field admin-inline-input"
+              value={nextName}
+              maxLength={64}
+              autoFocus
+              onChange={(event) => setNextName(event.target.value)}
+            />
+            <div className="admin-inline-actions">
+              <button className="admin-user-action admin-user-action--primary" type="submit" disabled={busy}>
+                保存
+              </button>
+              <button
+                className="admin-user-action"
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setEditing(false);
+                  setNextName(user.displayName);
+                }}
+              >
+                取消
+              </button>
+            </div>
+          </form>
+        ) : (
+          <span className="grid min-w-0">
+            <strong>{user.displayName}</strong>
+            <small>
+              {user.role === 'admin' ? '管理员' : '用户'}
+              {user.disabled ? ' · 已停用' : ''}
+              {isCurrentUser ? ' · 当前登录' : ''}
+            </small>
+          </span>
+        )}
+        {confirmingDelete ? (
+          <form className="admin-delete-confirm" onSubmit={submitDelete}>
+            <label>
+              输入用户名确认删除
+              <input
+                className="field admin-inline-input"
+                value={deleteConfirmation}
+                autoFocus
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+              />
+            </label>
+            <div className="admin-inline-actions">
+              <button
+                className="admin-user-action admin-user-action--danger"
+                type="submit"
+                disabled={busy || deleteConfirmation !== user.displayName}
+              >
+                删除用户
+              </button>
+              <button
+                className="admin-user-action"
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  setDeleteConfirmation('');
+                }}
+              >
+                取消
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </div>
+      <div className="admin-row-actions">
+        <button
+          className="admin-icon-action"
+          type="button"
+          title="修改用户名"
+          disabled={busy || editing}
+          onClick={() => {
+            setEditing(true);
+            setConfirmingDelete(false);
+          }}
+        >
+          <Pencil size={15} />
+        </button>
+        <button
+          className="admin-user-action"
+          type="button"
+          disabled={busy || !canDisable}
+          title={canDisable ? undefined : '不能停用当前用户或最后一个管理员'}
+          onClick={() => onToggleDisabled(user)}
+        >
+          {user.disabled ? '启用' : '停用'}
+        </button>
+        <button className="admin-user-action" type="button" disabled={busy} onClick={submitForceLogout}>
+          强退
+        </button>
+        <button
+          className="admin-icon-action admin-icon-action--danger"
+          type="button"
+          title={canDelete ? '删除用户' : '不能删除最后一个管理员'}
+          disabled={busy || !canDelete}
+          onClick={() => {
+            setConfirmingDelete(true);
+            setEditing(false);
+          }}
+        >
+          <Trash2 size={15} />
+        </button>
+      </div>
+    </div>
   );
 }
 

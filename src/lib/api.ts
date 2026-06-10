@@ -1,4 +1,6 @@
 import type {
+  AdminDeleteUserRequest,
+  AdminUpdateUserRequest,
   AdminUserResponse,
   AuthStatusResponse,
   ConfigResponse,
@@ -38,8 +40,25 @@ export function getAdminUsers(): Promise<AdminUserResponse> {
 }
 
 export function setUserDisabled(userId: string, disabled: boolean): Promise<{ ok: true }> {
+  return updateAdminUser(userId, { disabled });
+}
+
+export function updateAdminUser(userId: string, payload: AdminUpdateUserRequest): Promise<{ ok: true }> {
   return apiFetch<{ ok: true }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ disabled }),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function forceLogoutAdminUser(userId: string): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>(`/api/admin/users/${encodeURIComponent(userId)}/logout`, {
+    method: 'POST',
+  });
+}
+
+export function deleteAdminUser(userId: string, payload: AdminDeleteUserRequest): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>(`/api/admin/users/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+    body: JSON.stringify(payload),
   });
 }

@@ -1,6 +1,8 @@
 import {
   adminUsers,
   authStatus,
+  deleteAdminUser,
+  forceLogoutAdminUser,
   loginOptions,
   logout,
   registerOptions,
@@ -35,8 +37,12 @@ async function handleApi(request: Request, env: AppEnv, ctx: ExecutionContext): 
   if (url.pathname === '/api/auth/logout' && method === 'POST') return logout(env, request);
   if (url.pathname === '/api/admin/users' && method === 'GET') return adminUsers(env, request);
 
+  const adminUserLogoutMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/logout$/u);
+  if (adminUserLogoutMatch && method === 'POST') return forceLogoutAdminUser(env, request, adminUserLogoutMatch[1]);
+
   const adminUserMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)$/u);
   if (adminUserMatch && method === 'PATCH') return updateAdminUser(env, request, adminUserMatch[1]);
+  if (adminUserMatch && method === 'DELETE') return deleteAdminUser(env, request, adminUserMatch[1]);
 
   if (url.pathname === '/api/pastes' && method === 'POST') return createPaste(env, request);
   const pasteId = pasteIdFromPath(url.pathname);
