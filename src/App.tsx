@@ -57,7 +57,7 @@ import { loginWithPasskey, logout, passkeysSupported, registerWithPasskey } from
 import { formatBytes, formatDateTime, formatRelativeSeconds } from './lib/time';
 import { utf8ByteLength } from './lib/encoding';
 
-type Route = { name: 'home' } | { name: 'paste'; id: string };
+type Route = { name: 'home' } | { name: 'admin' } | { name: 'paste'; id: string };
 
 type CreatedPaste = {
   id: string;
@@ -120,6 +120,7 @@ const DOWNLOAD_EXTENSION_BY_LANGUAGE: Record<PasteLanguage, string> = {
 };
 
 function currentRoute(): Route {
+  if (window.location.pathname === '/admin') return { name: 'admin' };
   const match = window.location.pathname.match(/^\/p\/([a-z0-9]{16})$/u);
   if (match) return { name: 'paste', id: match[1] };
   return { name: 'home' };
@@ -134,9 +135,13 @@ function errorMessage(error: unknown): string {
 function AuthGate({
   status,
   refresh,
+  title = '创建需要 passkey',
+  closedMessage = '注册目前关闭。已注册用户可以继续登录创建。',
 }: {
   status: AuthStatusResponse;
   refresh: () => Promise<void>;
+  title?: string;
+  closedMessage?: string;
 }) {
   const [displayName, setDisplayName] = useState('');
   const [message, setMessage] = useState('');
@@ -174,7 +179,7 @@ function AuthGate({
     <section className="card p-6 sm:p-7 grid gap-4">
       <div className="flex items-center gap-2.5">
         <KeyRound size={18} className="text-primary" />
-        <h2 className="text-[21px] font-semibold tracking-[-0.2px]">创建需要 passkey</h2>
+        <h2 className="text-[21px] font-semibold tracking-[-0.2px]">{title}</h2>
       </div>
       {!supported ? (
         <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
@@ -207,7 +212,7 @@ function AuthGate({
           </button>
         </form>
       ) : (
-        <p className="text-[14px] text-ink-48">注册目前关闭。已注册用户可以继续登录创建。</p>
+        <p className="text-[14px] text-ink-48">{closedMessage}</p>
       )}
       {message ? (
         <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
@@ -234,9 +239,19 @@ function TopBar({
     await refresh();
   }
 
+  function navigateTo(routePath: string, nextRoute: Route) {
+    if (window.location.pathname !== routePath || window.location.search || window.location.hash) {
+      history.pushState({}, '', routePath);
+    }
+    setRoute(nextRoute);
+  }
+
   function goHome() {
-    history.pushState({}, '', '/');
-    setRoute({ name: 'home' });
+    navigateTo('/', { name: 'home' });
+  }
+
+  function goAdmin() {
+    navigateTo('/admin', { name: 'admin' });
   }
 
   return (
@@ -250,13 +265,19 @@ function TopBar({
         <span>Private Bin</span>
       </button>
       <nav className="flex items-center gap-2.5" aria-label="主要操作">
-        {route.name === 'paste' ? (
+        {route.name !== 'home' ? (
           <button className="btn-utility" type="button" onClick={goHome}>
             新建
           </button>
         ) : null}
         {status?.authenticated && status.user ? (
           <>
+            {status.user.role === 'admin' && route.name !== 'admin' ? (
+              <button className="btn-utility" type="button" onClick={goAdmin}>
+                <UsersRound size={15} />
+                用户管理
+              </button>
+            ) : null}
             <span
               className="hidden items-center gap-1.5 rounded-pill border border-hairline bg-canvas px-3 py-1.5 text-[14px] text-ink-80 sm:inline-flex"
               title={status.user.role === 'admin' ? '管理员' : '普通用户'}
@@ -541,32 +562,72 @@ function Home({
               </dl>
             </section>
           ) : null}
-
-          {status.user?.role === 'admin' ? <AdminPanel currentUser={status.user} /> : null}
         </aside>
       ) : null}
     </main>
   );
 }
 
+function AdminPage({
+  status,
+  refreshAuth,
+}: {
+  status: AuthStatusResponse;
+  refreshAuth: () => Promise<void>;
+}) {
+  if (!status.authenticated || !status.user) {
+    return (
+      <main className="admin-page admin-page--centered">
+        <AuthGate
+          status={status}
+          refresh={refreshAuth}
+          title="管理需要 passkey"
+          closedMessage="注册目前关闭。已注册管理员可以继续登录管理。"
+        />
+      </main>
+    );
+  }
+
+  if (status.user.role !== 'admin') {
+    return <CenteredNotice title="没有权限" message="只有管理员可以访问用户管理。" />;
+  }
+
+  return (
+    <main className="admin-page">
+      <section className="admin-shell">
+        <div className="admin-header">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <UsersRound size={20} className="shrink-0 text-primary" />
+            <h1>用户管理</h1>
+          </div>
+        </div>
+        <AdminPanel currentUser={status.user} />
+      </section>
+    </main>
+  );
+}
+
 function AdminPanel({ currentUser }: { currentUser: ApiUser }) {
   const [users, setUsers] = useState<ApiUser[]>([]);
-  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
   const loadUsers = useCallback(async () => {
     setMessage('');
+    setLoading(true);
     try {
       const response = await getAdminUsers();
       setUsers(response.users);
     } catch (error) {
       setMessage(errorMessage(error));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (open) void loadUsers();
-  }, [loadUsers, open]);
+    void loadUsers();
+  }, [loadUsers]);
 
   async function toggleUser(user: ApiUser) {
     setMessage('');
@@ -579,44 +640,38 @@ function AdminPanel({ currentUser }: { currentUser: ApiUser }) {
   }
 
   return (
-    <section className="card grid gap-3 p-6">
-      <button
-        className="inline-flex items-center gap-2.5 bg-transparent text-left text-[17px] font-semibold tracking-[-0.3px]"
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <UsersRound size={18} className="text-primary" />
-        用户管理
-      </button>
-      {open ? (
-        <div className="grid gap-2">
-          {users.map((user) => (
-            <div
-              className="flex items-center justify-between gap-3 border-t border-divider-soft pt-2.5"
-              key={user.id}
+    <section className="card admin-panel">
+      {loading ? (
+        <p className="admin-panel-state">正在读取用户...</p>
+      ) : null}
+      <div className="admin-user-list">
+        {users.map((user) => (
+          <div className="admin-user-row" key={user.id}>
+            <span className="grid min-w-0">
+              <strong>{user.displayName}</strong>
+              <small>
+                {user.role === 'admin' ? '管理员' : '用户'}
+                {user.disabled ? ' · 已停用' : ''}
+              </small>
+            </span>
+            <button
+              className="admin-user-action"
+              type="button"
+              disabled={user.id === currentUser.id}
+              onClick={() => toggleUser(user)}
             >
-              <span className="grid min-w-0">
-                <strong className="truncate text-[15px] font-semibold">{user.displayName}</strong>
-                <small className="truncate text-[13px] text-ink-48">
-                  {user.role === 'admin' ? '管理员' : '用户'}
-                </small>
-              </span>
-              <button
-                className="inline-flex h-8 items-center rounded-pill border border-hairline bg-canvas px-3.5 text-[13px] font-medium text-ink transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                type="button"
-                disabled={user.id === currentUser.id}
-                onClick={() => toggleUser(user)}
-              >
-                {user.disabled ? '启用' : '停用'}
-              </button>
-            </div>
-          ))}
-          {message ? (
-            <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
-              {message}
-            </p>
-          ) : null}
-        </div>
+              {user.disabled ? '启用' : '停用'}
+            </button>
+          </div>
+        ))}
+      </div>
+      {!loading && users.length === 0 && !message ? (
+        <p className="admin-panel-state">暂无用户。</p>
+      ) : null}
+      {message ? (
+        <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
+          {message}
+        </p>
       ) : null}
     </section>
   );
@@ -898,6 +953,8 @@ export default function App() {
       ) : null}
       {route.name === 'paste' ? (
         <ViewPaste id={route.id} />
+      ) : route.name === 'admin' && status ? (
+        <AdminPage status={status} refreshAuth={refreshAuth} />
       ) : status ? (
         <Home status={status} refreshAuth={refreshAuth} />
       ) : (
