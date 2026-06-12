@@ -1091,13 +1091,13 @@ function CodeViewer({ id, text, language }: { id: string; text: string; language
           {!canHighlight && language !== 'text' ? <span>文本较大，已使用纯文本显示</span> : null}
         </div>
         <div className="viewer-actions">
-          <button className="viewer-action-btn" type="button" onClick={copyText}>
-            {copyState === 'copied' ? <Check size={16} /> : <Copy size={16} />}
-            {copyState === 'copied' ? '已复制' : copyState === 'failed' ? '复制失败' : '复制内容'}
-          </button>
           <button className="viewer-action-btn" type="button" onClick={downloadText}>
             <Download size={16} />
             下载
+          </button>
+          <button className="viewer-action-btn" type="button" onClick={copyText}>
+            {copyState === 'copied' ? <Check size={16} /> : <Copy size={16} />}
+            {copyState === 'copied' ? '已复制' : copyState === 'failed' ? '复制失败' : '复制内容'}
           </button>
         </div>
       </div>
