@@ -19,17 +19,18 @@ export const DEFAULT_EXPIRATION_ID = '6hours';
 
 export const LANGUAGE_OPTIONS = [
   { id: 'text', label: '纯文本' },
+  { id: 'css', label: 'CSS' },
+  { id: 'go', label: 'Go' },
+  { id: 'html', label: 'HTML' },
   { id: 'javascript', label: 'JavaScript' },
-  { id: 'typescript', label: 'TypeScript' },
   { id: 'json', label: 'JSON' },
   { id: 'markdown', label: 'Markdown' },
-  { id: 'yaml', label: 'YAML' },
-  { id: 'css', label: 'CSS' },
-  { id: 'html', label: 'HTML' },
-  { id: 'shell', label: 'Shell' },
   { id: 'python', label: 'Python' },
-  { id: 'go', label: 'Go' },
   { id: 'rust', label: 'Rust' },
+  { id: 'shell', label: 'Shell' },
+  { id: 'toml', label: 'TOML' },
+  { id: 'typescript', label: 'TypeScript' },
+  { id: 'yaml', label: 'YAML' },
 ] as const;
 
 export type ExpirationId = (typeof EXPIRATION_OPTIONS)[number]['id'];

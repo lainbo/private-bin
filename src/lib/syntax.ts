@@ -3,33 +3,35 @@ import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 import type { PasteLanguage } from '../shared/constants';
 
 type SupportedLanguage =
+  | 'bash'
+  | 'css'
+  | 'go'
+  | 'html'
   | 'javascript'
-  | 'typescript'
   | 'json'
   | 'markdown'
-  | 'yaml'
-  | 'css'
-  | 'html'
-  | 'bash'
   | 'python'
-  | 'go'
-  | 'rust';
+  | 'rust'
+  | 'toml'
+  | 'typescript'
+  | 'yaml';
 
 let highlighterPromise: Promise<HighlighterCore> | null = null;
 
 const LANGUAGE_MAP: Record<PasteLanguage, SupportedLanguage | 'text'> = {
   text: 'text',
+  css: 'css',
+  go: 'go',
+  html: 'html',
   javascript: 'javascript',
-  typescript: 'typescript',
   json: 'json',
   markdown: 'markdown',
-  yaml: 'yaml',
-  css: 'css',
-  html: 'html',
-  shell: 'bash',
   python: 'python',
-  go: 'go',
   rust: 'rust',
+  shell: 'bash',
+  toml: 'toml',
+  typescript: 'typescript',
+  yaml: 'yaml',
 };
 
 function getHighlighter(): Promise<HighlighterCore> {
@@ -38,17 +40,18 @@ function getHighlighter(): Promise<HighlighterCore> {
       engine: createJavaScriptRegexEngine(),
       themes: [import('shiki/dist/themes/github-light.mjs')],
       langs: [
+        import('shiki/dist/langs/css.mjs'),
+        import('shiki/dist/langs/go.mjs'),
+        import('shiki/dist/langs/html.mjs'),
         import('shiki/dist/langs/javascript.mjs'),
-        import('shiki/dist/langs/typescript.mjs'),
         import('shiki/dist/langs/json.mjs'),
         import('shiki/dist/langs/markdown.mjs'),
-        import('shiki/dist/langs/yaml.mjs'),
-        import('shiki/dist/langs/css.mjs'),
-        import('shiki/dist/langs/html.mjs'),
-        import('shiki/dist/langs/bash.mjs'),
         import('shiki/dist/langs/python.mjs'),
-        import('shiki/dist/langs/go.mjs'),
         import('shiki/dist/langs/rust.mjs'),
+        import('shiki/dist/langs/bash.mjs'),
+        import('shiki/dist/langs/toml.mjs'),
+        import('shiki/dist/langs/typescript.mjs'),
+        import('shiki/dist/langs/yaml.mjs'),
       ],
     });
   }

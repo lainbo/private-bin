@@ -111,17 +111,18 @@ function useMediaQuery(query: string): boolean {
 
 const DOWNLOAD_EXTENSION_BY_LANGUAGE: Record<PasteLanguage, string> = {
   text: 'txt',
+  css: 'css',
+  go: 'go',
+  html: 'html',
   javascript: 'js',
-  typescript: 'ts',
   json: 'json',
   markdown: 'md',
-  yaml: 'yaml',
-  css: 'css',
-  html: 'html',
-  shell: 'sh',
   python: 'py',
-  go: 'go',
   rust: 'rs',
+  shell: 'sh',
+  toml: 'toml',
+  typescript: 'ts',
+  yaml: 'yaml',
 };
 
 function currentRoute(): Route {
