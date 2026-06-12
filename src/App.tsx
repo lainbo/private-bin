@@ -231,12 +231,10 @@ function AuthGate({
 function TopBar({
   status,
   refresh,
-  route,
   setRoute,
 }: {
   status: AuthStatusResponse | null;
   refresh: () => Promise<void>;
-  route: Route;
   setRoute: (route: Route) => void;
 }) {
   async function submitLogout() {
@@ -255,10 +253,6 @@ function TopBar({
     navigateTo('/', { name: 'home' });
   }
 
-  function goAdmin() {
-    navigateTo('/admin', { name: 'admin' });
-  }
-
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-hairline bg-[color-mix(in_srgb,var(--color-parchment)_82%,transparent)] px-4 py-3 backdrop-blur-xl backdrop-saturate-150 sm:px-8">
       <button
@@ -270,19 +264,8 @@ function TopBar({
         <span>Private Bin</span>
       </button>
       <nav className="flex items-center gap-2.5" aria-label="主要操作">
-        {route.name !== 'home' ? (
-          <button className="btn-utility" type="button" onClick={goHome}>
-            新建
-          </button>
-        ) : null}
         {status?.authenticated && status.user ? (
           <>
-            {status.user.role === 'admin' && route.name !== 'admin' ? (
-              <button className="btn-utility" type="button" onClick={goAdmin}>
-                <UsersRound size={15} />
-                用户管理
-              </button>
-            ) : null}
             <span
               className="hidden items-center gap-1.5 rounded-pill border border-hairline bg-canvas px-3 py-1.5 text-[14px] text-ink-80 sm:inline-flex"
               title={status.user.role === 'admin' ? '管理员' : '普通用户'}
@@ -1178,7 +1161,7 @@ export default function App() {
 
   return (
     <div className={route.name === 'paste' ? 'app-shell app-shell--paste' : 'app-shell'}>
-      <TopBar status={status} refresh={refreshAuth} route={route} setRoute={setRoute} />
+      <TopBar status={status} refresh={refreshAuth} setRoute={setRoute} />
       {message ? (
         <p className="mx-4 mt-3.5 rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b] sm:mx-8">
           {message}
