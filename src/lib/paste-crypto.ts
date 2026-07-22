@@ -1,13 +1,17 @@
 import type { PasteCryptoSpec } from '../shared/api-types';
 import type { PasteLanguage } from '../shared/constants';
 import { MAX_TEXT_BYTES } from '../shared/constants';
+import { deriveArgon2id } from './argon2';
 import { base64urlToBytes, bytesToBase64url, randomBase64url } from './base64url';
 import { concatBytes, decodeUtf8, toArrayBuffer, utf8ByteLength, utf8Bytes } from './encoding';
 
 const KEY_BYTES = 32;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
-const PBKDF2_ITERATIONS = 100_000;
+const ARGON2_MEMORY_KIB = 64 * 1024;
+const ARGON2_ITERATIONS = 4;
+const ARGON2_PARALLELISM = 5;
+const KEY_RE = /^[A-Za-z0-9_-]{43}$/u;
 
 export type EncryptedPaste = {
   ciphertext: string;
@@ -29,24 +33,18 @@ export function validateTextSize(text: string): number {
 
 async function deriveAesKey(secret: string, password: string, spec: PasteCryptoSpec): Promise<CryptoKey> {
   const keyBytes = base64urlToBytes(secret);
-  const passwordBytes = utf8Bytes(password);
-  const material = passwordBytes.byteLength > 0 ? concatBytes(keyBytes, passwordBytes) : keyBytes;
-  const imported = await crypto.subtle.importKey('raw', toArrayBuffer(material), { name: 'PBKDF2' }, false, [
-    'deriveKey',
+  const material = concatBytes(keyBytes, utf8Bytes(password));
+  const derivedKey = await deriveArgon2id({
+    password: material,
+    salt: base64urlToBytes(spec.salt),
+    iterations: spec.iterations,
+    memoryKiB: spec.memoryKiB,
+    parallelism: spec.parallelism,
+  });
+  return crypto.subtle.importKey('raw', toArrayBuffer(derivedKey), { name: 'AES-GCM' }, false, [
+    'encrypt',
+    'decrypt',
   ]);
-
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: toArrayBuffer(base64urlToBytes(spec.salt)),
-      iterations: spec.iterations,
-      hash: 'SHA-256',
-    },
-    imported,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
-  );
 }
 
 function aesParams(spec: PasteCryptoSpec): AesGcmParams {
@@ -67,15 +65,17 @@ export async function encryptPasteText(options: {
   const textSize = validateTextSize(options.text);
   const key = randomBase64url(KEY_BYTES);
   const cryptoSpec: PasteCryptoSpec = {
-    v: 1,
+    v: 2,
     alg: 'AES-GCM',
-    kdf: 'PBKDF2-SHA-256',
-    iterations: PBKDF2_ITERATIONS,
+    kdf: 'ARGON2ID',
+    iterations: ARGON2_ITERATIONS,
+    memoryKiB: ARGON2_MEMORY_KIB,
+    parallelism: ARGON2_PARALLELISM,
     salt: randomBase64url(SALT_BYTES),
     iv: randomBase64url(IV_BYTES),
     tagLength: 128,
     aad: {
-      v: 1,
+      v: 2,
       language: options.language,
       burnAfterReading: options.burnAfterReading,
       requiresPassword: options.password.length > 0,
@@ -115,7 +115,7 @@ export function parsePasteHash(hash: string): { key: string; requiresLoadConfirm
   const value = hash.startsWith('#') ? hash.slice(1) : hash;
   const requiresLoadConfirmation = value.startsWith('-');
   const key = requiresLoadConfirmation ? value.slice(1) : value;
-  if (!key) {
+  if (!KEY_RE.test(key)) {
     throw new Error('链接里缺少解密密钥。');
   }
   return { key, requiresLoadConfirmation };

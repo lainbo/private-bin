@@ -20,6 +20,8 @@ import { HttpError, jsonResponse, readJson } from './response';
 import { randomId } from './crypto';
 
 const ID_RE = /^[a-z0-9]{16}$/u;
+const SALT_RE = /^[A-Za-z0-9_-]{22}$/u;
+const IV_RE = /^[A-Za-z0-9_-]{16}$/u;
 const MAX_CIPHERTEXT_CHARS = 1_500_000;
 const MAX_CRYPTO_CHARS = 8_000;
 
@@ -42,15 +44,19 @@ function parseCrypto(value: unknown): PasteCryptoSpec {
   if (!value || typeof value !== 'object') throw new HttpError(400, '加密参数不正确。');
   const spec = value as PasteCryptoSpec;
   if (
-    spec.v !== 1 ||
+    spec.v !== 2 ||
     spec.alg !== 'AES-GCM' ||
-    spec.kdf !== 'PBKDF2-SHA-256' ||
-    spec.iterations !== 100_000 ||
+    spec.kdf !== 'ARGON2ID' ||
+    spec.iterations !== 4 ||
+    spec.memoryKiB !== 64 * 1024 ||
+    spec.parallelism !== 5 ||
     typeof spec.salt !== 'string' ||
+    !SALT_RE.test(spec.salt) ||
     typeof spec.iv !== 'string' ||
+    !IV_RE.test(spec.iv) ||
     spec.tagLength !== 128 ||
     !spec.aad ||
-    spec.aad.v !== 1 ||
+    spec.aad.v !== 2 ||
     typeof spec.aad.burnAfterReading !== 'boolean' ||
     typeof spec.aad.requiresPassword !== 'boolean' ||
     !isPasteLanguage(spec.aad.language)
@@ -115,7 +121,7 @@ export async function createPaste(env: AppEnv, request: Request): Promise<Respon
   await env.DB.prepare(
     `INSERT INTO pastes
      (id, owner_user_id, version, ciphertext, crypto, expires_at, burn_after_reading, requires_password, text_size, language, created_at)
-     VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, 2, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -144,6 +150,22 @@ export async function getPaste(env: AppEnv, id: string): Promise<Response> {
     env.DB.prepare(
       'UPDATE pastes SET read_count = read_count + 1, last_read_at = ? WHERE id = ? AND burn_after_reading = 0 AND expires_at > ?',
     ).bind(now, pasteId, now),
+  ]);
+  const rows = (results[0].results ?? []) as unknown as PasteRow[];
+  const row = rows[0];
+  if (!row || row.expires_at <= now) throw new HttpError(404, 'Paste 不存在、已过期或已删除。');
+  if (row.burn_after_reading === 1) {
+    throw new HttpError(409, '这个 Paste 需要确认后才能打开。');
+  }
+  return jsonResponse(rowToPaste(row, now));
+}
+
+export async function consumePaste(env: AppEnv, id: string): Promise<Response> {
+  const pasteId = validatePasteId(id);
+  const now = Date.now();
+  const results = await env.DB.batch([
+    env.DB.prepare('SELECT * FROM pastes WHERE id = ?').bind(pasteId),
+    env.DB.prepare('DELETE FROM pastes WHERE id = ? AND expires_at <= ?').bind(pasteId, now),
     env.DB.prepare('DELETE FROM pastes WHERE id = ? AND burn_after_reading = 1 AND expires_at > ?').bind(
       pasteId,
       now,
@@ -152,6 +174,7 @@ export async function getPaste(env: AppEnv, id: string): Promise<Response> {
   const rows = (results[0].results ?? []) as unknown as PasteRow[];
   const row = rows[0];
   if (!row || row.expires_at <= now) throw new HttpError(404, 'Paste 不存在、已过期或已删除。');
+  if (row.burn_after_reading !== 1) throw new HttpError(400, '这个 Paste 不是阅后即焚。');
   return jsonResponse(rowToPaste(row, now));
 }
 

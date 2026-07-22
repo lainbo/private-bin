@@ -2,3 +2,6 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+
+overrides:
+  dompurify: 3.4.12

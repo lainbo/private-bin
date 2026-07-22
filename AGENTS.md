@@ -28,7 +28,7 @@
 - React 插件：`@vitejs/plugin-react-oxc`
 - Cloudflare：`@cloudflare/vite-plugin`、Wrangler、Workers Static Assets、D1
 - 测试：Vitest
-- 加密：浏览器 Web Crypto，AES-GCM + PBKDF2-SHA256
+- 加密：浏览器 Web Crypto + WebAssembly，AES-GCM + Argon2id（64 MiB、4 次、并行度 5）
 - Passkey/WebAuthn：`@simplewebauthn/browser`、`@simplewebauthn/server`
 - 代码高亮：Shiki，查看代码模式时懒加载
 - 二维码：`qrcode`
@@ -44,6 +44,7 @@
 - `src/shared/constants.ts`：过期选项、语言选项、大小限制等共享常量。
 - `src/shared/api-types.ts`：前后端共享 API 类型。
 - `src/lib/paste-crypto.ts`：前端加密/解密、查看密码参与派生、URL fragment 相关核心逻辑。
+- `src/lib/argon2.ts`、`src/lib/argon2.worker.ts`：在独立 Web Worker 中执行 Argon2id，避免阻塞主线程。
 - `src/lib/passkey.ts`：浏览器端 WebAuthn/passkey 调用。
 - `src/lib/syntax.ts`：Shiki 懒加载高亮器，只加载选定语言和主题。
 - `src/worker/index.ts`：Worker fetch 入口和 API 路由。
@@ -71,7 +72,7 @@ pnpm cf-types
 
 本地开发服务通常是 Vite 启动的 `http://127.0.0.1:5173/`。
 
-`src/worker/response.ts` 对本地 `localhost` / `127.0.0.1` 的静态资源响应放宽了 CSP 的 `script-src 'unsafe-inline'`，这是为了允许 Vite dev 注入 React Refresh preamble。生产环境不会放宽该项。
+`src/worker/response.ts` 对本地 `localhost` / `127.0.0.1` 的静态资源响应放宽了 CSP 的 `script-src 'unsafe-inline'`，这是为了允许 Vite dev 注入 React Refresh preamble。生产环境不会放宽该项。生产 CSP 保留窄范围的 `'wasm-unsafe-eval'` 供 Argon2id WebAssembly 使用，不要改成更宽松的 `'unsafe-eval'`。
 
 ## Cloudflare 部署
 
@@ -222,7 +223,7 @@ fragment 不会发送到服务端。二维码只包含完整 URL，不包含查�
 阅后即焚查看流程：
 
 - 前端先识别 `#-` 并提示确认。
-- 用户确认后再请求 API。
+- 用户确认后通过 `POST /api/pastes/:id/consume` 请求 API；普通 GET 不得删除阅后即焚记录。
 - 服务端读取 burn paste 时应做到取回记录后删除。
 - 过期记录读取时删除并返回统一 404。
 

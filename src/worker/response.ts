@@ -1,9 +1,10 @@
 const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
+  'Cache-Control': 'no-store',
 };
 
 const CONTENT_SECURITY_POLICY =
-  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; manifest-src 'self'";
+  "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; manifest-src 'self'";
 
 const SECURITY_HEADERS = {
   'Referrer-Policy': 'no-referrer',
@@ -77,9 +78,8 @@ export async function readJson<T>(request: Request): Promise<T> {
 
 export function assertSameOrigin(request: Request): void {
   const origin = request.headers.get('Origin');
-  if (!origin) return;
   const requestOrigin = new URL(request.url).origin;
-  if (origin !== requestOrigin) {
+  if (!origin || origin !== requestOrigin) {
     throw new HttpError(403, '请求来源不被允许。');
   }
 }

@@ -20,6 +20,13 @@ describe('paste crypto', () => {
         password: '',
       }),
     ).resolves.toBe('console.log("hello");');
+    expect(encrypted.crypto).toMatchObject({
+      v: 2,
+      kdf: 'ARGON2ID',
+      iterations: 4,
+      memoryKiB: 64 * 1024,
+      parallelism: 5,
+    });
   });
 
   it('requires the same password when password protection is enabled', async () => {
@@ -50,15 +57,38 @@ describe('paste crypto', () => {
   });
 
   it('parses normal and burn-after-reading URL fragments', () => {
-    expect(parsePasteHash('#abc123')).toEqual({
-      key: 'abc123',
+    const key = 'a'.repeat(43);
+    expect(parsePasteHash(`#${key}`)).toEqual({
+      key,
       requiresLoadConfirmation: false,
     });
-    expect(parsePasteHash('#-abc123')).toEqual({
-      key: 'abc123',
+    expect(parsePasteHash(`#-${key}`)).toEqual({
+      key,
       requiresLoadConfirmation: true,
     });
     expect(() => parsePasteHash('#')).toThrow('链接里缺少解密密钥。');
+    expect(() => parsePasteHash('#too-short')).toThrow('链接里缺少解密密钥。');
+  });
+
+  it('authenticates public metadata through AES-GCM AAD', async () => {
+    const encrypted = await encryptPasteText({
+      text: '不可篡改的内容',
+      password: '',
+      language: 'text',
+      burnAfterReading: false,
+    });
+
+    await expect(
+      decryptPasteText({
+        ciphertext: encrypted.ciphertext,
+        crypto: {
+          ...encrypted.crypto,
+          aad: { ...encrypted.crypto.aad, burnAfterReading: true },
+        },
+        key: encrypted.key,
+        password: '',
+      }),
+    ).rejects.toThrow();
   });
 
   it('enforces the 1MB plaintext limit', () => {

@@ -43,6 +43,7 @@ import {
 } from './shared/constants';
 import {
   createPaste,
+  consumePaste,
   deleteAdminUser,
   forceLogoutAdminUser,
   getAdminUsers,
@@ -912,15 +913,15 @@ function ViewPaste({ id }: { id: string }) {
   const needsPassword = paste?.requiresPassword && !plainText;
 
   useEffect(() => {
-    const key = 'key' in hashInfo ? hashInfo.key : null;
-    if (!confirmed || !key) return;
-    const pasteKey = key;
+    if (!confirmed || !('key' in hashInfo)) return;
+    const pasteKey = hashInfo.key;
+    const shouldConsume = hashInfo.requiresLoadConfirmation;
     let cancelled = false;
     async function loadPaste() {
       setLoading(true);
       setMessage('');
       try {
-        const response = await getPaste(id);
+        const response = shouldConsume ? await consumePaste(id) : await getPaste(id);
         if (cancelled) return;
         setPaste(response);
         if (!response.requiresPassword) {

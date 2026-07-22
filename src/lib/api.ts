@@ -29,6 +29,13 @@ export function getPaste(id: string): Promise<PasteResponse> {
   return apiFetch<PasteResponse>(`/api/pastes/${encodeURIComponent(id)}`);
 }
 
+export function consumePaste(id: string): Promise<PasteResponse> {
+  return apiFetch<PasteResponse>(`/api/pastes/${encodeURIComponent(id)}/consume`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
 export function deletePaste(id: string): Promise<{ ok: true }> {
   return apiFetch<{ ok: true }>(`/api/pastes/${encodeURIComponent(id)}`, {
     method: 'DELETE',

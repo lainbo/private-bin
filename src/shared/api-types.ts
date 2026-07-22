@@ -29,15 +29,17 @@ export type ConfigResponse = {
 };
 
 export type PasteCryptoSpec = {
-  v: 1;
+  v: 2;
   alg: 'AES-GCM';
-  kdf: 'PBKDF2-SHA-256';
+  kdf: 'ARGON2ID';
   iterations: number;
+  memoryKiB: number;
+  parallelism: number;
   salt: string;
   iv: string;
   tagLength: 128;
   aad: {
-    v: 1;
+    v: 2;
     language: PasteLanguage;
     burnAfterReading: boolean;
     requiresPassword: boolean;

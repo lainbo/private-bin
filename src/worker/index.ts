@@ -12,11 +12,16 @@ import {
 } from './auth';
 import { cleanupExpired } from './db';
 import type { AppEnv } from './env';
-import { configResponse, createPaste, deletePaste, getPaste } from './pastes';
+import { configResponse, consumePaste, createPaste, deletePaste, getPaste } from './pastes';
 import { assertSameOrigin, assetResponse, errorResponse, HttpError } from './response';
 
 function pasteIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/api\/pastes\/([^/]+)$/u);
+  return match?.[1] ?? null;
+}
+
+function burnPasteIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/api\/pastes\/([^/]+)\/consume$/u);
   return match?.[1] ?? null;
 }
 
@@ -45,6 +50,8 @@ async function handleApi(request: Request, env: AppEnv, ctx: ExecutionContext): 
   if (adminUserMatch && method === 'DELETE') return deleteAdminUser(env, request, adminUserMatch[1]);
 
   if (url.pathname === '/api/pastes' && method === 'POST') return createPaste(env, request);
+  const burnPasteId = burnPasteIdFromPath(url.pathname);
+  if (burnPasteId && method === 'POST') return consumePaste(env, burnPasteId);
   const pasteId = pasteIdFromPath(url.pathname);
   if (pasteId && method === 'GET') return getPaste(env, pasteId);
   if (pasteId && method === 'DELETE') return deletePaste(env, request, pasteId);
