@@ -52,6 +52,7 @@
 - `src/worker/pastes.ts`：paste 创建、读取、删除、过期、阅后即焚逻辑。
 - `src/worker/db.ts`：D1 查询辅助和过期数据清理。
 - `src/worker/response.ts`：JSON 响应、安全响应头、同源检查。
+- `src/worker/rate-limit.ts`：原生 Rate Limiting 检查及 HTTP 429 重试提示。
 - `migrations/0001_initial.sql`：D1 schema。
 - `wrangler.jsonc`：本地真实 Cloudflare Worker、Static Assets、D1、域名和公开环境变量配置，已在 `.gitignore` 中排除。
 - `wrangler.jsonc.example`：可提交的 Cloudflare 配置模板；新环境部署时复制为 `wrangler.jsonc` 后替换域名和 D1 ID。
@@ -84,6 +85,9 @@ pnpm cf-types
 - `run_worker_first` 为 `true`
 - 自定义域名为 `bin.lainbo.dev`
 - `workers_dev` 为 `false`
+- Cron 每 5 分钟清理过期数据；读取时仍立即校验过期时间。
+- `AUTH_RATE_LIMITER` 按来源 IP 合并限制登录和注册接口为每分钟 30 次。
+- `CREATE_RATE_LIMITER` 按已认证用户限制创建接口为每分钟 10 次。
 
 公开仓库不会提交真实 `wrangler.jsonc`。首次部署时：
 
@@ -231,6 +235,9 @@ fragment 不会发送到服务端。二维码只包含完整 URL，不包含查�
 
 - 明文 UTF-8 不超过 1MB。
 - 大文本超过高亮阈值时降级为纯文本显示。
+- 创建接口 JSON 上限为 2 MiB，其他需要解析 JSON 的接口为 64 KiB，按实际读取字节限制，超限返回 413。
+
+停用用户必须在同一个 D1 batch 中撤销该用户的全部 session，重新启用后需要重新登录。
 
 ## UI 和产品约束
 

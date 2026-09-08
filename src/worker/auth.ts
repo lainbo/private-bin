@@ -344,7 +344,11 @@ export async function updateAdminUser(env: AppEnv, request: Request, userId: str
   updates.push('updated_at = ?');
   values.push(Date.now(), userId);
 
-  await env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
+  const statements = [env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...values)];
+  if (body.disabled === true) {
+    statements.push(env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId));
+  }
+  await env.DB.batch(statements);
   return jsonResponse({ ok: true });
 }
 

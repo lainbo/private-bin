@@ -127,15 +127,8 @@ function setup(rows: PasteRow[]): AppEnv {
   return {
     DB: new TestDatabase(rows) as unknown as D1Database,
     ASSETS: {} as Fetcher,
-  };
-}
-
-function testContext(waitUntil: (promise: Promise<unknown>) => void = () => {}): ExecutionContext {
-  return {
-    waitUntil,
-    passThroughOnException() {},
-    exports: { default: {} as ExecutionContext['exports']['default'] },
-    props: undefined,
+    AUTH_RATE_LIMITER: { limit: async () => ({ success: true }) },
+    CREATE_RATE_LIMITER: { limit: async () => ({ success: true }) },
   };
 }
 
@@ -184,15 +177,12 @@ describe('paste retrieval', () => {
 
   it('routes an exact same-origin POST to the burn consume endpoint', async () => {
     const rows = [pasteRow({ id: 'ffffffffffffffff', burn: true })];
-    const pending: Promise<unknown>[] = [];
-    const context = testContext((promise) => pending.push(promise));
     const request = new Request('https://bin.example.com/api/pastes/ffffffffffffffff/consume', {
       method: 'POST',
       headers: { Origin: 'https://bin.example.com' },
     });
 
-    const response = await worker.fetch(request, setup(rows), context);
-    await Promise.all(pending);
+    const response = await worker.fetch(request, setup(rows));
 
     expect(response.status).toBe(200);
     expect(rows).toHaveLength(0);
@@ -204,7 +194,7 @@ describe('paste retrieval', () => {
       method: 'POST',
     });
 
-    const response = await worker.fetch(request, setup(rows), testContext());
+    const response = await worker.fetch(request, setup(rows));
 
     expect(response.status).toBe(403);
     expect(rows).toHaveLength(1);

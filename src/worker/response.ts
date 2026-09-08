@@ -33,6 +33,7 @@ export class HttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly headers?: HeadersInit,
   ) {
     super(message);
     this.name = 'HttpError';
@@ -48,7 +49,7 @@ export function jsonResponse(payload: unknown, init: ResponseInit = {}): Respons
 
 export function errorResponse(error: unknown): Response {
   if (error instanceof HttpError) {
-    return jsonResponse({ message: error.message }, { status: error.status });
+    return jsonResponse({ message: error.message }, { status: error.status, headers: error.headers });
   }
   console.error(error);
   return jsonResponse({ message: '服务器暂时无法处理请求。' }, { status: 500 });
@@ -64,13 +65,32 @@ export async function assetResponse(response: Response, request?: Request): Prom
   });
 }
 
-export async function readJson<T>(request: Request): Promise<T> {
+export async function readJson<T>(request: Request, maxBytes = 64 * 1024): Promise<T> {
   const contentType = request.headers.get('Content-Type') ?? '';
   if (!contentType.includes('application/json')) {
     throw new HttpError(415, '请求必须使用 JSON。');
   }
+  if (!request.body) throw new HttpError(400, 'JSON 格式不正确。');
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let text = '';
   try {
-    return (await request.json()) as T;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        throw new HttpError(413, '请求内容过大。');
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  try {
+    return JSON.parse(text + decoder.decode()) as T;
   } catch {
     throw new HttpError(400, 'JSON 格式不正确。');
   }

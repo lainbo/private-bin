@@ -27,7 +27,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useTransition,
 } from 'react';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import type { EditorProps } from '@monaco-editor/react';
@@ -306,12 +305,14 @@ function Home({
   const [created, setCreated] = useState<CreatedPaste | null>(null);
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [submitting, setSubmitting] = useState(false);
   const shareCardRef = useRef<HTMLElement | null>(null);
   const textSize = useMemo(() => utf8ByteLength(text), [text]);
   const selectedExpiration = EXPIRATION_OPTIONS.find((option) => option.id === expirationId) ?? EXPIRATION_OPTIONS[4];
 
   async function submitPaste() {
+    if (submitting) return;
+    setSubmitting(true);
     setMessage('');
     setCopied(false);
     try {
@@ -347,14 +348,14 @@ function Home({
       });
     } catch (error) {
       setMessage(errorMessage(error));
+    } finally {
+      setSubmitting(false);
     }
   }
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
-    startTransition(() => {
-      void submitPaste();
-    });
+    void submitPaste();
   }
 
   async function copyLink() {
@@ -428,9 +429,9 @@ function Home({
               >
                 {formatBytes(textSize)} / {formatBytes(MAX_TEXT_BYTES)}
               </span>
-              <button className="btn-pill" type="submit" disabled={isPending || textSize === 0}>
+              <button className="btn-pill" type="submit" disabled={submitting || textSize === 0}>
                 <Send size={18} />
-                {isPending ? '加密中' : '生成链接'}
+                {submitting ? '加密中' : '生成链接'}
               </button>
             </div>
           </form>
@@ -909,6 +910,7 @@ function ViewPaste({ id }: { id: string }) {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [decrypting, setDecrypting] = useState(false);
 
   const needsPassword = paste?.requiresPassword && !plainText;
 
@@ -947,7 +949,8 @@ function ViewPaste({ id }: { id: string }) {
 
   async function submitPassword(event: FormEvent) {
     event.preventDefault();
-    if (!paste || !('key' in hashInfo)) return;
+    if (decrypting || !paste || !('key' in hashInfo)) return;
+    setDecrypting(true);
     setMessage('');
     try {
       const text = await decryptPasteText({
@@ -959,6 +962,8 @@ function ViewPaste({ id }: { id: string }) {
       setPlainText(text);
     } catch {
       setMessage('无法解密。请确认密码是否正确。');
+    } finally {
+      setDecrypting(false);
     }
   }
 
@@ -970,7 +975,7 @@ function ViewPaste({ id }: { id: string }) {
     return (
       <CenteredNotice
         title="这是阅后即焚 Paste"
-        message="打开后服务端会立即删除它。确认周围环境安全后再继续。"
+        message="打开后服务端会立即删除它，即使尚未解密。刷新、关闭页面或网络中断可能导致内容永久丢失。确认周围环境安全后再继续。"
       >
         <button className="btn-pill" type="button" onClick={() => setConfirmed(true)}>
           <Flame size={18} />
@@ -1013,8 +1018,8 @@ function ViewPaste({ id }: { id: string }) {
             placeholder="输入创建者另行告知的密码"
             onChange={(event) => setPassword(event.target.value)}
           />
-          <button className="btn-pill w-full" type="submit" disabled={!password}>
-            解密
+          <button className="btn-pill w-full" type="submit" disabled={!password || decrypting}>
+            {decrypting ? '解密中' : '解密'}
           </button>
         </form>
       ) : null}

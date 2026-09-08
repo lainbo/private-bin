@@ -14,6 +14,7 @@ import { cleanupExpired } from './db';
 import type { AppEnv } from './env';
 import { configResponse, consumePaste, createPaste, deletePaste, getPaste } from './pastes';
 import { assertSameOrigin, assetResponse, errorResponse, HttpError } from './response';
+import { enforceRateLimit } from './rate-limit';
 
 function pasteIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/api\/pastes\/([^/]+)$/u);
@@ -25,13 +26,16 @@ function burnPasteIdFromPath(pathname: string): string | null {
   return match?.[1] ?? null;
 }
 
-async function handleApi(request: Request, env: AppEnv, ctx: ExecutionContext): Promise<Response> {
+async function handleApi(request: Request, env: AppEnv): Promise<Response> {
   const url = new URL(request.url);
   const method = request.method.toUpperCase();
   if (method !== 'GET') {
     assertSameOrigin(request);
   }
-  ctx.waitUntil(cleanupExpired(env));
+  if (method === 'POST' && /^\/api\/auth\/(login|register)\/(options|verify)$/u.test(url.pathname)) {
+    const ip = request.headers.get('CF-Connecting-IP') ?? 'local';
+    await enforceRateLimit(env.AUTH_RATE_LIMITER, `private-bin:auth:${ip}`);
+  }
 
   if (url.pathname === '/api/config' && method === 'GET') return configResponse();
   if (url.pathname === '/api/auth/status' && method === 'GET') return authStatus(env, request);
@@ -60,15 +64,18 @@ async function handleApi(request: Request, env: AppEnv, ctx: ExecutionContext): 
 }
 
 export default {
-  async fetch(request: Request, env: AppEnv, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: AppEnv): Promise<Response> {
     try {
       const url = new URL(request.url);
       if (url.pathname.startsWith('/api/')) {
-        return await handleApi(request, env, ctx);
+        return await handleApi(request, env);
       }
       return await assetResponse(await env.ASSETS.fetch(request), request);
     } catch (error) {
       return errorResponse(error);
     }
+  },
+  async scheduled(_controller: ScheduledController, env: AppEnv): Promise<void> {
+    await cleanupExpired(env);
   },
 };

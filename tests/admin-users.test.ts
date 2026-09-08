@@ -161,6 +161,8 @@ async function setupEnv(users: TestUser[]): Promise<{ env: AppEnv; tables: TestT
     env: {
       DB: new TestD1Database(tables) as unknown as D1Database,
       ASSETS: {} as Fetcher,
+      AUTH_RATE_LIMITER: { limit: async () => ({ success: true }) },
+      CREATE_RATE_LIMITER: { limit: async () => ({ success: true }) },
     },
     tables,
     cookie: 'pb_session=admin-token',

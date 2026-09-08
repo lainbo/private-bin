@@ -18,6 +18,7 @@ import type { PasteRow } from './db';
 import type { AppEnv } from './env';
 import { HttpError, jsonResponse, readJson } from './response';
 import { randomId } from './crypto';
+import { enforceRateLimit } from './rate-limit';
 
 const ID_RE = /^[a-z0-9]{16}$/u;
 const SALT_RE = /^[A-Za-z0-9_-]{22}$/u;
@@ -108,7 +109,8 @@ function rowToPaste(row: PasteRow, now: number): PasteResponse {
 
 export async function createPaste(env: AppEnv, request: Request): Promise<Response> {
   const auth = await requireUser(env, request);
-  const body = validateCreatePaste(await readJson<CreatePasteRequest>(request));
+  await enforceRateLimit(env.CREATE_RATE_LIMITER, `private-bin:create:${auth.user.id}`);
+  const body = validateCreatePaste(await readJson<CreatePasteRequest>(request, 2 * 1024 * 1024));
   const now = Date.now();
   const expiresAt = now + body.expiresInSeconds * 1000;
   let id = randomId(16);

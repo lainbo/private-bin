@@ -4,4 +4,8 @@ allowBuilds:
   workerd: true
 
 overrides:
-  dompurify: 3.4.12
+  dompurify: 3.4.15
+  vite>esbuild: 0.28.1
+
+patchedDependencies:
+  monaco-editor@0.56.0: patches/monaco-editor@0.56.0.patch
