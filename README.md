@@ -57,6 +57,8 @@ pnpm exec wrangler deploy
 
 使用 Cloudflare Workers Builds 连接 GitHub 仓库，生产分支设为 `main`，关闭非生产分支构建。推送到 `main` 后，检查和构建全部通过才会部署。
 
+当前 `lainbo/private-bin` 仓库已连接到 `private-bin` Worker；可在 Cloudflare 的部署页面查看每次提交的构建日志和发布结果。
+
 构建设置：
 
 - 根目录：仓库根目录。
