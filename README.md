@@ -53,6 +53,24 @@ pnpm exec wrangler deploy
 
 注册窗口由 `ALLOW_PASSKEY_REGISTRATION` 控制。注册完可信用户后应改回 `false` 并重新部署。
 
+## 自动发布
+
+使用 Cloudflare Workers Builds 连接 GitHub 仓库，生产分支设为 `main`，关闭非生产分支构建。推送到 `main` 后，检查和构建全部通过才会部署。
+
+构建设置：
+
+- 根目录：仓库根目录。
+- 构建命令：`pnpm install --frozen-lockfile && pnpm build:ci`。
+- 部署命令：`pnpm run deploy`。
+- 构建变量：`PNPM_VERSION=12.3.4`、`SKIP_DEPENDENCY_INSTALL=true`、`DEPLOY_HOST=<YOUR_DOMAIN>`、`D1_DATABASE_ID=<YOUR_D1_DATABASE_ID>`。
+- Node.js 版本由 `.node-version` 固定；pnpm 版本与 `package.json` 的 `packageManager` 保持一致。
+
+`pnpm build:ci` 从模板生成 `wrangler.jsonc`，然后依次生成 Worker 类型、运行类型检查、现有测试和生产构建。该命令会覆盖本地 `wrangler.jsonc`；本地使用已有配置时运行 `pnpm check && pnpm build`。
+
+域名和 D1 ID 由构建变量提供，生成的真实配置仍不提交。其余 Worker 配置（包括注册开关、限流和 Cron）以 `wrangler.jsonc.example` 为准。自动发布会恢复模板中的配置；通过临时本地配置开放注册后，应及时关闭注册窗口。
+
+部署凭据由 Workers Builds 管理，不写入仓库。D1 schema 迁移单独执行，不包含在每次自动发布中。发布后检查首页、`/api/config` 和 `/api/auth/status`，确认注册窗口状态符合预期。
+
 ## 安全与资源限制
 
 - 登录和注册接口按来源 IP 合并限制为每分钟 30 次；同一网络中的用户共享额度。

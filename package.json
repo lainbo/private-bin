@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "pnpm@12.3.4",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
@@ -10,7 +11,11 @@
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "typecheck": "tsc --noEmit",
-    "cf-types": "wrangler types"
+    "cf-types": "wrangler types",
+    "configure:build": "node scripts/configure-build.mjs",
+    "check": "pnpm cf-types && pnpm typecheck && pnpm test",
+    "build:ci": "pnpm configure:build && pnpm check && pnpm build",
+    "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

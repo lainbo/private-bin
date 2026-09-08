@@ -77,6 +77,10 @@ pnpm cf-types
 
 ## Cloudflare 部署
 
+自动发布使用 Workers Builds：`main` 推送触发，关闭非生产分支构建。构建命令为 `pnpm install --frozen-lockfile && pnpm build:ci`，部署命令为 `pnpm run deploy`。Cloudflare 构建变量设置 `PNPM_VERSION=12.3.4`、`SKIP_DEPENDENCY_INSTALL=true`、`DEPLOY_HOST` 和 `D1_DATABASE_ID`；Node.js 版本由 `.node-version` 固定。
+
+`scripts/configure-build.mjs` 从 `wrangler.jsonc.example` 和上述部署标识生成真实 `wrangler.jsonc`。自动构建随后执行 `cf-types`、类型检查、现有测试和构建。模板是自动发布的 Worker 配置依据，限流、Cron、注册开关等变更必须同步到模板。真实配置继续忽略；本地使用已有配置时运行 `pnpm check && pnpm build`，不要执行会覆盖配置的 `build:ci`。D1 迁移单独执行。
+
 当前部署形态是单个 Worker：
 
 - Worker 处理 `/api/*`
