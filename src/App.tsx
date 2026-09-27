@@ -2,6 +2,7 @@ import { toDataURL } from 'qrcode';
 import {
   AlertTriangle,
   Check,
+  CircleAlert,
   Clock,
   Copy,
   Download,
@@ -9,13 +10,14 @@ import {
   EyeOff,
   Flame,
   KeyRound,
+  LoaderCircle,
   LogOut,
   Pencil,
   Trash2,
   QrCode,
-  RefreshCcw,
   Send,
   ShieldCheck,
+  SlidersHorizontal,
   UserRound,
   UsersRound,
 } from 'lucide-react';
@@ -85,10 +87,13 @@ const MONACO_EDITOR_OPTIONS = {
   fixedOverflowWidgets: true,
   fontFamily: '"JetBrains Mono","HarmonyOS Sans SC","Cascadia Code","Consolas","Menlo","Twemoji Mozilla","monospace"',
   fontSize: 20,
+  hideCursorInOverviewRuler: true,
   minimap: { enabled: false },
+  overviewRulerBorder: false,
   padding: { top: 24, bottom: 24 },
   renderLineHighlight: 'line',
   scrollBeyondLastLine: false,
+  scrollbar: { useShadows: false },
   tabSize: 2,
   wordWrap: 'on',
 } satisfies EditorProps['options'];
@@ -138,15 +143,30 @@ function errorMessage(error: unknown): string {
   return '操作失败。';
 }
 
+function initialOf(name: string): string {
+  return (Array.from(name.trim())[0] ?? '?').toUpperCase();
+}
+
+function ErrorMessage({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <p className={`alert ${className}`} role="alert">
+      <CircleAlert size={16} />
+      <span>{children}</span>
+    </p>
+  );
+}
+
 function AuthGate({
   status,
   refresh,
-  title = '创建需要 passkey',
+  title = '登录 Private Bin',
+  description = '使用 passkey 登录后即可创建加密分享',
   closedMessage = '注册目前关闭。已注册用户可以继续登录创建。',
 }: {
   status: AuthStatusResponse;
   refresh: () => Promise<void>;
   title?: string;
+  description?: string;
   closedMessage?: string;
 }) {
   const [displayName, setDisplayName] = useState('');
@@ -182,24 +202,26 @@ function AuthGate({
   }
 
   return (
-    <section className="card p-6 sm:p-7 grid gap-4">
-      <div className="flex items-center gap-2.5">
-        <KeyRound size={18} className="text-primary" />
-        <h2 className="text-[21px] font-semibold tracking-[-0.2px]">{title}</h2>
+    <section className="card auth-card rise-in">
+      <div className="auth-head">
+        <span className="icon-badge">
+          <KeyRound size={20} />
+        </span>
+        <h2>{title}</h2>
+        <p>{description}</p>
       </div>
       {!supported ? (
-        <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
-          当前浏览器不支持 WebAuthn/passkey。请换用支持 passkey 的浏览器或启用 Bitwarden 扩展。
-        </p>
+        <ErrorMessage>当前浏览器不支持 WebAuthn/passkey。请换用支持 passkey 的浏览器或启用 Bitwarden 扩展。</ErrorMessage>
       ) : null}
-      <button className="btn-pill w-full" type="button" disabled={!supported || busy} onClick={submitLogin}>
-        <KeyRound size={18} />
+      <button className="btn btn-primary btn-lg w-full" type="button" disabled={!supported || busy} onClick={submitLogin}>
+        <KeyRound size={17} />
         使用 passkey 登录
       </button>
       {status.registrationOpen ? (
-        <form className="grid gap-3 border-t border-divider-soft pt-4" onSubmit={submitRegister}>
-          <label className="grid gap-1.5 text-[13px] font-semibold text-ink-48">
-            注册名称
+        <form className="grid gap-4" onSubmit={submitRegister}>
+          <div className="auth-divider">或</div>
+          <label className="field-group">
+            <span className="field-label">注册名称</span>
             <input
               className="field"
               value={displayName}
@@ -209,22 +231,18 @@ function AuthGate({
             />
           </label>
           <button
-            className="btn-ghost w-full"
+            className="btn btn-secondary btn-lg w-full"
             type="submit"
             disabled={!supported || busy || !displayName.trim()}
           >
-            <UserRound size={18} />
+            <UserRound size={17} />
             注册新的 passkey
           </button>
         </form>
       ) : (
-        <p className="text-[14px] text-ink-48">{closedMessage}</p>
+        <p className="auth-note">{closedMessage}</p>
       )}
-      {message ? (
-        <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
-          {message}
-        </p>
-      ) : null}
+      {message ? <ErrorMessage>{message}</ErrorMessage> : null}
     </section>
   );
 }
@@ -255,31 +273,21 @@ function TopBar({
   }
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-hairline bg-[color-mix(in_srgb,var(--color-parchment)_82%,transparent)] px-4 py-3 backdrop-blur-xl backdrop-saturate-150 sm:px-8">
-      <button
-        className="inline-flex items-center gap-2 bg-transparent text-[17px] font-semibold tracking-[-0.3px] cursor-pointer"
-        type="button"
-        onClick={goHome}
-      >
-        <ShieldCheck size={20} className="text-primary" />
+    <header className="topbar">
+      <button className="brand" type="button" onClick={goHome}>
+        <span className="brand-mark">
+          <ShieldCheck size={16} strokeWidth={2.25} />
+        </span>
         <span>Private Bin</span>
       </button>
-      <nav className="flex items-center gap-2.5" aria-label="主要操作">
+      <nav className="flex items-center gap-1.5" aria-label="主要操作">
         {status?.authenticated && status.user ? (
           <>
-            <span
-              className="hidden items-center gap-1.5 rounded-pill border border-hairline bg-canvas px-3 py-1.5 text-[14px] text-ink-80 sm:inline-flex"
-              title={status.user.role === 'admin' ? '管理员' : '普通用户'}
-            >
-              <UserRound size={15} className="text-ink-48" />
-              {status.user.displayName}
+            <span className="user-chip" title={status.user.role === 'admin' ? '管理员' : '普通用户'}>
+              <span className="avatar">{initialOf(status.user.displayName)}</span>
+              <span className="hidden max-w-40 truncate sm:inline">{status.user.displayName}</span>
             </span>
-            <button
-              className="inline-flex h-9 w-9 items-center justify-center rounded-pill border border-hairline bg-canvas text-ink-80 transition-transform active:scale-95"
-              type="button"
-              title="退出登录"
-              onClick={submitLogout}
-            >
+            <button className="icon-btn" type="button" title="退出登录" onClick={submitLogout}>
               <LogOut size={17} />
             </button>
           </>
@@ -410,7 +418,7 @@ function Home({
                     height="100%"
                     width="100%"
                     language="plaintext"
-                    theme="vs"
+                    theme="private-bin"
                     value={text}
                     options={editorOptions}
                     loading={<div className="editor-loading">正在加载编辑器...</div>}
@@ -420,17 +428,11 @@ function Home({
               )}
             </div>
             <div className="editor-statusbar">
-              <span
-                className={
-                  textSize > MAX_TEXT_BYTES
-                    ? 'text-[14px] font-semibold text-[#b84a3b]'
-                    : 'text-[14px] text-ink-48'
-                }
-              >
+              <span className={textSize > MAX_TEXT_BYTES ? 'byte-count byte-count--over' : 'byte-count'}>
                 {formatBytes(textSize)} / {formatBytes(MAX_TEXT_BYTES)}
               </span>
-              <button className="btn-pill" type="submit" disabled={submitting || textSize === 0}>
-                <Send size={18} />
+              <button className="btn btn-primary" type="submit" disabled={submitting || textSize === 0}>
+                {submitting ? <LoaderCircle size={16} className="spin" /> : <Send size={16} />}
                 {submitting ? '加密中' : '生成链接'}
               </button>
             </div>
@@ -442,13 +444,15 @@ function Home({
 
       {status.authenticated ? (
         <aside className="create-sidebar">
-          <section className="card sidebar-panel">
-            <div className="sidebar-title">
-              <Clock size={18} className="text-primary" />
+          <section className="card panel">
+            <div className="panel-head">
+              <span className="panel-icon">
+                <SlidersHorizontal size={15} />
+              </span>
               <h2>选项</h2>
             </div>
-            <label className="grid gap-1.5 text-[13px] font-semibold text-ink-48">
-              过期时间
+            <label className="field-group">
+              <span className="field-label">过期时间</span>
               <select
                 className="field"
                 value={expirationId}
@@ -461,8 +465,8 @@ function Home({
                 ))}
               </select>
             </label>
-            <label className="grid gap-1.5 text-[13px] font-semibold text-ink-48">
-              代码高亮
+            <label className="field-group">
+              <span className="field-label">代码高亮</span>
               <select
                 className="field"
                 value={language}
@@ -475,8 +479,8 @@ function Home({
                 ))}
               </select>
             </label>
-            <label className="grid gap-1.5 text-[13px] font-semibold text-ink-48">
-              查看密码
+            <label className="field-group">
+              <span className="field-label">查看密码</span>
               <span className="relative block">
                 <input
                   className="field pr-11"
@@ -486,68 +490,76 @@ function Home({
                   onChange={(event) => setPassword(event.target.value)}
                 />
                 <button
-                  className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-ink-48 transition-colors hover:text-ink"
+                  className="icon-btn absolute right-[3px] top-1/2 -translate-y-1/2"
                   type="button"
                   title={showPassword ? '隐藏密码' : '显示密码'}
                   onClick={() => setShowPassword((value) => !value)}
                 >
-                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </span>
             </label>
-            <label className="flex items-center gap-3 text-[15px] text-ink">
+            <label className="toggle-row">
+              <span className="toggle-row-icon">
+                <Flame size={16} />
+              </span>
+              <span className="toggle-row-text">
+                <span className="toggle-row-title">阅后即焚</span>
+                <span className="toggle-row-desc">首次打开后立即删除</span>
+              </span>
               <input
-                className="h-[18px] w-[18px] accent-primary"
+                className="switch"
                 type="checkbox"
+                role="switch"
                 checked={burnAfterReading}
                 onChange={(event) => setBurnAfterReading(event.target.checked)}
               />
-              <span className="inline-flex items-center gap-2">
-                <Flame size={17} className="text-primary" />
-                阅后即焚
-              </span>
             </label>
           </section>
 
-          {message ? (
-            <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
-              {message}
-            </p>
-          ) : null}
+          {message ? <ErrorMessage>{message}</ErrorMessage> : null}
 
           {created ? (
-            <section className="card sidebar-panel" ref={shareCardRef}>
-              <div className="sidebar-title">
-                <QrCode size={18} className="text-primary" />
+            <section className="card panel rise-in" key={created.id} ref={shareCardRef}>
+              <div className="panel-head">
+                <span className="panel-icon">
+                  <QrCode size={15} />
+                </span>
                 <h2>分享</h2>
               </div>
-              <img
-                className="mx-auto block w-[min(224px,100%)] rounded-md border border-hairline"
-                src={created.qrDataUrl}
-                alt="分享二维码"
-              />
+              <div className="qr-frame">
+                <img src={created.qrDataUrl} alt="分享二维码" />
+              </div>
               <div className="share-url" title={created.url}>
                 {created.url}
               </div>
-              <button className="btn-ghost w-full" type="button" onClick={copyLink}>
-                {copied ? <Check size={18} /> : <Copy size={18} />}
+              <button className="btn btn-primary w-full" type="button" onClick={copyLink}>
+                {copied ? <Check size={16} /> : <Copy size={16} />}
                 {copied ? '已复制' : '复制链接'}
               </button>
-              <dl className="grid gap-0">
-                <div className="flex items-center justify-between gap-4 border-t border-divider-soft py-2.5">
-                  <dt className="text-[13px] text-ink-48">过期</dt>
-                  <dd className="m-0 text-[14px] font-semibold">{formatDateTime(created.expiresAt)}</dd>
+              <dl className="meta-list">
+                <div>
+                  <dt>过期</dt>
+                  <dd>{formatDateTime(created.expiresAt)}</dd>
                 </div>
-                <div className="flex items-center justify-between gap-4 border-t border-divider-soft py-2.5">
-                  <dt className="text-[13px] text-ink-48">密码</dt>
-                  <dd className="m-0 text-[14px] font-semibold">
-                    {created.requiresPassword ? '已启用' : '未设置'}
+                <div>
+                  <dt>密码</dt>
+                  <dd>
+                    {created.requiresPassword ? (
+                      <span className="badge badge--accent">已启用</span>
+                    ) : (
+                      <span className="badge">未设置</span>
+                    )}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-4 border-t border-divider-soft py-2.5">
-                  <dt className="text-[13px] text-ink-48">阅后即焚</dt>
-                  <dd className="m-0 text-[14px] font-semibold">
-                    {created.burnAfterReading ? '已启用' : '关闭'}
+                <div>
+                  <dt>阅后即焚</dt>
+                  <dd>
+                    {created.burnAfterReading ? (
+                      <span className="badge badge--warn">已启用</span>
+                    ) : (
+                      <span className="badge">关闭</span>
+                    )}
                   </dd>
                 </div>
               </dl>
@@ -572,7 +584,8 @@ function AdminPage({
         <AuthGate
           status={status}
           refresh={refreshAuth}
-          title="管理需要 passkey"
+          title="登录管理后台"
+          description="仅管理员可以管理用户"
           closedMessage="注册目前关闭。已注册管理员可以继续登录管理。"
         />
       </main>
@@ -587,10 +600,10 @@ function AdminPage({
     <main className="admin-page">
       <section className="admin-shell">
         <div className="admin-header">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <UsersRound size={20} className="shrink-0 text-primary" />
-            <h1>用户管理</h1>
-          </div>
+          <span className="panel-icon">
+            <UsersRound size={16} />
+          </span>
+          <h1>用户管理</h1>
         </div>
         <AdminPanel currentUser={status.user} refreshAuth={refreshAuth} />
       </section>
@@ -700,11 +713,7 @@ function AdminPanel({
       {!loading && users.length === 0 && !message ? (
         <p className="admin-panel-state">暂无用户。</p>
       ) : null}
-      {message ? (
-        <p className="rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b]">
-          {message}
-        </p>
-      ) : null}
+      {message ? <ErrorMessage>{message}</ErrorMessage> : null}
     </section>
   );
 }
@@ -794,11 +803,11 @@ function AdminUserRow({
               onChange={(event) => setNextName(event.target.value)}
             />
             <div className="admin-inline-actions">
-              <button className="admin-user-action admin-user-action--primary" type="submit" disabled={busy}>
+              <button className="btn btn-primary btn-sm" type="submit" disabled={busy}>
                 保存
               </button>
               <button
-                className="admin-user-action"
+                className="btn btn-secondary btn-sm"
                 type="button"
                 disabled={busy}
                 onClick={() => {
@@ -811,19 +820,26 @@ function AdminUserRow({
             </div>
           </form>
         ) : (
-          <span className="grid min-w-0">
-            <strong>{user.displayName}</strong>
-            <small>
-              {user.role === 'admin' ? '管理员' : '用户'}
-              {user.disabled ? ' · 已停用' : ''}
-              {isCurrentUser ? ' · 当前登录' : ''}
-            </small>
+          <span className="admin-user-identity">
+            <span className="avatar avatar--lg">{initialOf(user.displayName)}</span>
+            <span className="grid min-w-0">
+              <strong>{user.displayName}</strong>
+              <span className="admin-user-tags">
+                {user.role === 'admin' ? (
+                  <span className="badge badge--accent">管理员</span>
+                ) : (
+                  <span className="badge">用户</span>
+                )}
+                {user.disabled ? <span className="badge badge--danger">已停用</span> : null}
+                {isCurrentUser ? <span className="badge">当前登录</span> : null}
+              </span>
+            </span>
           </span>
         )}
         {confirmingDelete ? (
           <form className="admin-delete-confirm" onSubmit={submitDelete}>
-            <label>
-              输入用户名确认删除
+            <label className="field-group">
+              <span className="field-label">输入用户名确认删除</span>
               <input
                 className="field admin-inline-input"
                 value={deleteConfirmation}
@@ -833,14 +849,14 @@ function AdminUserRow({
             </label>
             <div className="admin-inline-actions">
               <button
-                className="admin-user-action admin-user-action--danger"
+                className="btn btn-danger btn-sm"
                 type="submit"
                 disabled={busy || deleteConfirmation !== user.displayName}
               >
                 删除用户
               </button>
               <button
-                className="admin-user-action"
+                className="btn btn-secondary btn-sm"
                 type="button"
                 disabled={busy}
                 onClick={() => {
@@ -856,7 +872,7 @@ function AdminUserRow({
       </div>
       <div className="admin-row-actions">
         <button
-          className="admin-icon-action"
+          className="icon-btn icon-btn--bordered"
           type="button"
           title="修改用户名"
           disabled={busy || editing}
@@ -868,7 +884,7 @@ function AdminUserRow({
           <Pencil size={15} />
         </button>
         <button
-          className="admin-user-action"
+          className="btn btn-secondary btn-sm"
           type="button"
           disabled={busy || !canDisable}
           title={canDisable ? undefined : '不能停用当前用户或最后一个管理员'}
@@ -876,11 +892,11 @@ function AdminUserRow({
         >
           {user.disabled ? '启用' : '停用'}
         </button>
-        <button className="admin-user-action" type="button" disabled={busy} onClick={submitForceLogout}>
+        <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={submitForceLogout}>
           强退
         </button>
         <button
-          className="admin-icon-action admin-icon-action--danger"
+          className="icon-btn icon-btn--bordered icon-btn--danger"
           type="button"
           title={canDelete ? '删除用户' : '不能删除最后一个管理员'}
           disabled={busy || !canDelete}
@@ -977,8 +993,8 @@ function ViewPaste({ id }: { id: string }) {
         title="这是阅后即焚 Paste"
         message="打开后服务端会立即删除它，即使尚未解密。刷新、关闭页面或网络中断可能导致内容永久丢失。确认周围环境安全后再继续。"
       >
-        <button className="btn-pill" type="button" onClick={() => setConfirmed(true)}>
-          <Flame size={18} />
+        <button className="btn btn-primary btn-lg w-full" type="button" onClick={() => setConfirmed(true)}>
+          <Flame size={17} />
           现在打开
         </button>
       </CenteredNotice>
@@ -990,25 +1006,42 @@ function ViewPaste({ id }: { id: string }) {
       {paste ? (
         <dl className="paste-meta-strip" aria-label="Paste 信息">
           <div>
-            <dt>剩余</dt>
+            <dt>
+              <Clock size={14} />
+              剩余
+            </dt>
             <dd>{formatRelativeSeconds(paste.timeToLiveSeconds)}</dd>
           </div>
           <div>
-            <dt>密码</dt>
+            <dt>
+              <KeyRound size={14} />
+              密码
+            </dt>
             <dd>{paste.requiresPassword ? '需要' : '无'}</dd>
           </div>
-          <div>
-            <dt>阅后即焚</dt>
+          <div className={paste.burnAfterReading ? 'is-warn' : undefined}>
+            <dt>
+              <Flame size={14} />
+              阅后即焚
+            </dt>
             <dd>{paste.burnAfterReading ? '是' : '否'}</dd>
           </div>
         </dl>
       ) : null}
-      {loading ? <p className="paste-inline-state">正在读取密文...</p> : null}
+      {message && !needsPassword ? <ErrorMessage>{message}</ErrorMessage> : null}
+      {loading ? (
+        <p className="paste-inline-state">
+          <LoaderCircle size={16} className="spin" />
+          正在读取密文...
+        </p>
+      ) : null}
       {needsPassword ? (
-        <form className="card paste-password-panel" onSubmit={submitPassword}>
-          <div className="flex items-center gap-2.5">
-            <KeyRound size={18} className="text-primary" />
-            <h2 className="text-[21px] font-semibold tracking-[-0.2px]">需要查看密码</h2>
+        <form className="card auth-card paste-password-panel rise-in" onSubmit={submitPassword}>
+          <div className="auth-head">
+            <span className="icon-badge">
+              <KeyRound size={20} />
+            </span>
+            <h2>需要查看密码</h2>
           </div>
           <input
             className="field"
@@ -1018,16 +1051,12 @@ function ViewPaste({ id }: { id: string }) {
             placeholder="输入创建者另行告知的密码"
             onChange={(event) => setPassword(event.target.value)}
           />
-          <button className="btn-pill w-full" type="submit" disabled={!password || decrypting}>
+          {message ? <ErrorMessage>{message}</ErrorMessage> : null}
+          <button className="btn btn-primary btn-lg w-full" type="submit" disabled={!password || decrypting}>
+            {decrypting ? <LoaderCircle size={16} className="spin" /> : null}
             {decrypting ? '解密中' : '解密'}
           </button>
         </form>
-      ) : null}
-      {message ? (
-        <p className="paste-error">
-          <AlertTriangle size={18} />
-          {message}
-        </p>
       ) : null}
       {plainText && paste ? <CodeViewer id={id} text={plainText} language={paste.language} /> : null}
     </main>
@@ -1089,20 +1118,20 @@ function CodeViewer({ id, text, language }: { id: string; text: string; language
   }
 
   return (
-    <section className="viewer-shell">
+    <section className="card viewer-shell rise-in">
       <div className="viewer-toolbar">
         <div className="viewer-toolbar-info">
-          <span className="font-semibold text-ink-80">{languageLabel}</span>
+          <span className="badge badge--accent">{languageLabel}</span>
           {highlighting ? <span>高亮加载中</span> : null}
           {!canHighlight && language !== 'text' ? <span>文本较大，已使用纯文本显示</span> : null}
         </div>
         <div className="viewer-actions">
-          <button className="viewer-action-btn" type="button" onClick={downloadText}>
-            <Download size={16} />
+          <button className="btn btn-ghost btn-sm" type="button" onClick={downloadText}>
+            <Download size={15} />
             下载
           </button>
-          <button className="viewer-action-btn" type="button" onClick={copyText}>
-            {copyState === 'copied' ? <Check size={16} /> : <Copy size={16} />}
+          <button className="btn btn-ghost btn-sm" type="button" onClick={copyText}>
+            {copyState === 'copied' ? <Check size={15} /> : <Copy size={15} />}
             {copyState === 'copied' ? '已复制' : copyState === 'failed' ? '复制失败' : '复制内容'}
           </button>
         </div>
@@ -1131,13 +1160,15 @@ function CenteredNotice({
   children?: ReactNode;
 }) {
   return (
-    <main className="grid min-h-[calc(100dvh-70px)] place-items-center p-6">
-      <section className="card grid w-[min(480px,100%)] gap-3 p-6 sm:p-7">
-        <div className="flex items-center gap-2.5">
-          <AlertTriangle size={18} className="text-primary" />
-          <h1 className="text-[21px] font-semibold tracking-[-0.2px]">{title}</h1>
+    <main className="notice-page">
+      <section className="card notice-card rise-in">
+        <div className="auth-head">
+          <span className="icon-badge icon-badge--warn">
+            <AlertTriangle size={20} />
+          </span>
+          <h1>{title}</h1>
+          <p>{message}</p>
         </div>
-        <p className="m-0 text-[15px] leading-[1.5] text-ink-48">{message}</p>
         {children}
       </section>
     </main>
@@ -1169,11 +1200,7 @@ export default function App() {
   return (
     <div className={route.name === 'paste' ? 'app-shell app-shell--paste' : 'app-shell'}>
       <TopBar status={status} refresh={refreshAuth} setRoute={setRoute} />
-      {message ? (
-        <p className="mx-4 mt-3.5 rounded-md bg-[color-mix(in_srgb,#b84a3b_8%,white)] px-3 py-2.5 text-[14px] text-[#b84a3b] sm:mx-8">
-          {message}
-        </p>
-      ) : null}
+      {message ? <ErrorMessage className="mx-4 mt-4 sm:mx-6">{message}</ErrorMessage> : null}
       {route.name === 'paste' ? (
         <ViewPaste id={route.id} />
       ) : route.name === 'admin' && status ? (
@@ -1181,8 +1208,8 @@ export default function App() {
       ) : status ? (
         <Home status={status} refreshAuth={refreshAuth} />
       ) : (
-        <main className="grid min-h-[calc(100dvh-70px)] place-items-center p-6">
-          <RefreshCcw className="spin text-ink-48" size={24} />
+        <main className="page-loading">
+          <LoaderCircle className="spin" size={24} />
         </main>
       )}
     </div>
