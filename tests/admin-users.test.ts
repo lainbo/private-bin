@@ -231,7 +231,7 @@ describe('admin user management', () => {
     expect(tables.users.some((row) => row.id === 'admin-1')).toBe(true);
   });
 
-  it('rejects disabling the last active admin', async () => {
+  it('rejects disabling the signed-in admin', async () => {
     const { env, tables, cookie } = await setupEnv([user('admin-1', 'Admin', 'admin'), user('user-1', 'User', 'user')]);
 
     await expect(updateAdminUser(env, jsonRequest(cookie, { disabled: true }), 'admin-1')).rejects.toThrow(
