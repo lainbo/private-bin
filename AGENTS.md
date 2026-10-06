@@ -38,7 +38,13 @@
 
 ## 目录导览
 
-- `src/App.tsx`：主要 React UI，包含创建、查看、passkey 登录/注册、成功页和二维码展示。
+- `src/App.tsx`：根组件，负责登录状态、路由切换和页脚。
+- `src/routes.ts`：前端路由类型和按地址解析当前路由。
+- `src/pages/Home.tsx`：创建页，包含编辑器、选项、成功后的分享链接和二维码。
+- `src/pages/ViewPaste.tsx`：查看页，包含阅后即焚确认、查看密码输入和解密。
+- `src/pages/AdminPage.tsx`：管理员用户管理页。
+- `src/components/`：页面共用组件，包括 passkey 登录/注册、顶栏、代码查看器和提示组件。
+- `src/lib/ui.ts`：界面错误文案和头像首字母等展示辅助函数。
 - `src/main.tsx`：React 入口。
 - `src/styles.css`：全局 UI 样式，桌面优先，同时适配移动端。
 - `src/shared/constants.ts`：过期选项、语言选项、大小限制等共享常量。
