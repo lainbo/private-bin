@@ -126,7 +126,7 @@ describe('paste retrieval', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('returns and atomically deletes a burn paste through explicit consume', async () => {
+  it('returns and deletes a burn paste through explicit consume', async () => {
     const rows = [pasteRow({ id: 'bbbbbbbbbbbbbbbb', burn: true })];
 
     const response = await consumePaste(setup(rows), 'bbbbbbbbbbbbbbbb');
