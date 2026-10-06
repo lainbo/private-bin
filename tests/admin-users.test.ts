@@ -12,7 +12,7 @@ type TestUser = UserRow;
 
 type TestTables = {
   users: TestUser[];
-  sessions: Array<{ token_hash: string; user_id: string; expires_at: number; created_at: number; last_seen_at: number }>;
+  sessions: Array<{ token_hash: string; user_id: string; expires_at: number; created_at: number }>;
   pastes: Array<{ id: string; owner_user_id: string }>;
   passkeyCredentials: Array<{ credential_id: string; user_id: string }>;
 };
@@ -64,13 +64,6 @@ class TestD1Statement {
   }
 
   async run(): Promise<QueryResult> {
-    if (this.query.startsWith('UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?')) {
-      const [lastSeenAt, tokenHash] = this.values as [number, string];
-      const session = this.tables.sessions.find((row) => row.token_hash === tokenHash);
-      if (session) session.last_seen_at = lastSeenAt;
-      return { success: true };
-    }
-
     if (this.query.startsWith('UPDATE users SET')) {
       const userId = this.values[this.values.length - 1] as string;
       const user = this.tables.users.find((row) => row.id === userId);
@@ -145,8 +138,8 @@ async function setupEnv(users: TestUser[]): Promise<{ env: AppEnv; tables: TestT
   const tables: TestTables = {
     users,
     sessions: [
-      { token_hash: tokenHash, user_id: 'admin-1', expires_at: Date.now() + 60_000, created_at: 1, last_seen_at: 1 },
-      { token_hash: 'target-session', user_id: 'user-1', expires_at: Date.now() + 60_000, created_at: 1, last_seen_at: 1 },
+      { token_hash: tokenHash, user_id: 'admin-1', expires_at: Date.now() + 60_000, created_at: 1 },
+      { token_hash: 'target-session', user_id: 'user-1', expires_at: Date.now() + 60_000, created_at: 1 },
     ],
     pastes: [
       { id: 'paste-1', owner_user_id: 'user-1' },

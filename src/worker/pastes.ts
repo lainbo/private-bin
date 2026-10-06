@@ -149,9 +149,6 @@ export async function getPaste(env: AppEnv, id: string): Promise<Response> {
   const results = await env.DB.batch([
     env.DB.prepare('SELECT * FROM pastes WHERE id = ?').bind(pasteId),
     env.DB.prepare('DELETE FROM pastes WHERE id = ? AND expires_at <= ?').bind(pasteId, now),
-    env.DB.prepare(
-      'UPDATE pastes SET read_count = read_count + 1, last_read_at = ? WHERE id = ? AND burn_after_reading = 0 AND expires_at > ?',
-    ).bind(now, pasteId, now),
   ]);
   const rows = (results[0].results ?? []) as unknown as PasteRow[];
   const row = rows[0];

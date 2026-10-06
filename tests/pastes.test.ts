@@ -51,18 +51,6 @@ class TestStatement {
       return { success: true };
     }
 
-    if (this.query.startsWith('UPDATE pastes SET read_count = read_count + 1')) {
-      const [now, id, expiresAfter] = this.values as [number, string, number];
-      const row = this.rows.find(
-        (item) => item.id === id && item.burn_after_reading === 0 && item.expires_at > expiresAfter,
-      );
-      if (row) {
-        row.read_count += 1;
-        row.last_read_at = now;
-      }
-      return { success: true };
-    }
-
     if (this.query.includes('DELETE FROM pastes WHERE id = ? AND burn_after_reading = 1')) {
       const [id, now] = this.values as [string, number];
       this.remove((row) => row.id === id && row.burn_after_reading === 1 && row.expires_at > now);
@@ -118,8 +106,6 @@ function pasteRow(options: { id: string; burn: boolean; expiresAt?: number }): P
     text_size: 10,
     language: 'text',
     created_at: Date.now(),
-    read_count: 0,
-    last_read_at: null,
   };
 }
 
@@ -158,14 +144,13 @@ describe('paste retrieval', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('keeps a normal paste and records its read', async () => {
+  it('returns a normal paste without deleting it', async () => {
     const rows = [pasteRow({ id: 'dddddddddddddddd', burn: false })];
 
     const response = await getPaste(setup(rows), 'dddddddddddddddd');
 
     expect(response.status).toBe(200);
-    expect(rows[0].read_count).toBe(1);
-    expect(rows[0].last_read_at).not.toBeNull();
+    expect(rows).toHaveLength(1);
   });
 
   it('deletes an expired paste and returns not found', async () => {

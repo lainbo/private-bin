@@ -115,9 +115,6 @@ export async function getAuthContext(env: AppEnv, request: Request): Promise<Aut
     .bind(tokenHash, now)
     .first<UserRow>();
   if (!session || session.disabled === 1) return null;
-  await env.DB.prepare('UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?')
-    .bind(now, tokenHash)
-    .run();
   return { user: session, tokenHash };
 }
 

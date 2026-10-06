@@ -47,8 +47,6 @@ export type PasteRow = {
   text_size: number;
   language: string;
   created_at: number;
-  read_count: number;
-  last_read_at: number | null;
 };
 
 export function toApiUser(row: UserRow): ApiUser {
