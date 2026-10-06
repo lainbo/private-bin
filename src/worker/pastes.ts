@@ -6,13 +6,19 @@ import type {
   PasteResponse,
 } from '../shared/api-types';
 import {
+  ARGON2_ITERATIONS,
+  ARGON2_MEMORY_KIB,
+  ARGON2_PARALLELISM,
   EXPIRATION_OPTIONS,
   EXPIRATION_SECONDS,
   getDefaultExpirationSeconds,
   isPasteLanguage,
+  IV_BYTES,
   LANGUAGE_OPTIONS,
   MAX_TEXT_BYTES,
+  SALT_BYTES,
 } from '../shared/constants';
+import { base64urlPattern } from '../lib/base64url';
 import { requireUser } from './auth';
 import type { PasteRow } from './db';
 import type { AppEnv } from './env';
@@ -21,8 +27,8 @@ import { randomId } from './crypto';
 import { enforceRateLimit } from './rate-limit';
 
 const ID_RE = /^[a-z0-9]{16}$/u;
-const SALT_RE = /^[A-Za-z0-9_-]{22}$/u;
-const IV_RE = /^[A-Za-z0-9_-]{16}$/u;
+const SALT_RE = base64urlPattern(SALT_BYTES);
+const IV_RE = base64urlPattern(IV_BYTES);
 const MAX_CIPHERTEXT_CHARS = 1_500_000;
 const MAX_CRYPTO_CHARS = 8_000;
 
@@ -48,9 +54,9 @@ function parseCrypto(value: unknown): PasteCryptoSpec {
     spec.v !== 2 ||
     spec.alg !== 'AES-GCM' ||
     spec.kdf !== 'ARGON2ID' ||
-    spec.iterations !== 4 ||
-    spec.memoryKiB !== 64 * 1024 ||
-    spec.parallelism !== 5 ||
+    spec.iterations !== ARGON2_ITERATIONS ||
+    spec.memoryKiB !== ARGON2_MEMORY_KIB ||
+    spec.parallelism !== ARGON2_PARALLELISM ||
     typeof spec.salt !== 'string' ||
     !SALT_RE.test(spec.salt) ||
     typeof spec.iv !== 'string' ||

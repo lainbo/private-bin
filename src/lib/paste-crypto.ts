@@ -1,17 +1,19 @@
 import type { PasteCryptoSpec } from '../shared/api-types';
 import type { PasteLanguage } from '../shared/constants';
-import { MAX_TEXT_BYTES } from '../shared/constants';
+import {
+  ARGON2_ITERATIONS,
+  ARGON2_MEMORY_KIB,
+  ARGON2_PARALLELISM,
+  IV_BYTES,
+  MAX_TEXT_BYTES,
+  SALT_BYTES,
+} from '../shared/constants';
 import { deriveArgon2id } from './argon2';
-import { base64urlToBytes, bytesToBase64url, randomBase64url } from './base64url';
+import { base64urlPattern, base64urlToBytes, bytesToBase64url, randomBase64url } from './base64url';
 import { concatBytes, decodeUtf8, toArrayBuffer, utf8ByteLength, utf8Bytes } from './encoding';
 
 const KEY_BYTES = 32;
-const SALT_BYTES = 16;
-const IV_BYTES = 12;
-const ARGON2_MEMORY_KIB = 64 * 1024;
-const ARGON2_ITERATIONS = 4;
-const ARGON2_PARALLELISM = 5;
-const KEY_RE = /^[A-Za-z0-9_-]{43}$/u;
+const KEY_RE = base64urlPattern(KEY_BYTES);
 
 export type EncryptedPaste = {
   ciphertext: string;

@@ -3,6 +3,12 @@ export const APP_NAME = 'Private Bin';
 export const MAX_TEXT_BYTES = 1_000_000;
 export const HIGHLIGHT_BYTE_LIMIT = 250_000;
 
+export const SALT_BYTES = 16;
+export const IV_BYTES = 12;
+export const ARGON2_MEMORY_KIB = 64 * 1024;
+export const ARGON2_ITERATIONS = 4;
+export const ARGON2_PARALLELISM = 5;
+
 export const EXPIRATION_OPTIONS = [
   { id: '10min', label: '10 分钟', seconds: 10 * 60 },
   { id: '30min', label: '30 分钟', seconds: 30 * 60 },

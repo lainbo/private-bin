@@ -22,3 +22,7 @@ export function randomBase64url(byteLength: number): string {
   crypto.getRandomValues(bytes);
   return bytesToBase64url(bytes);
 }
+
+export function base64urlPattern(byteLength: number): RegExp {
+  return new RegExp(`^[A-Za-z0-9_-]{${Math.ceil((byteLength * 4) / 3)}}$`, 'u');
+}
