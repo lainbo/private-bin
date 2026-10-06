@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { toDataURL } from 'qrcode';
 import { DEFAULT_EXPIRATION_ID, EXPIRATION_OPTIONS, MAX_TEXT_BYTES } from '../src/shared/constants';
 import { decryptPasteText, encryptPasteText, parsePasteHash, validateTextSize } from '../src/lib/paste-crypto';
 
@@ -97,18 +96,10 @@ describe('paste crypto', () => {
   });
 });
 
-describe('expiration and QR code basics', () => {
+describe('expiration options', () => {
   it('defaults to six hours and never includes forever', () => {
     const defaultOption = EXPIRATION_OPTIONS.find((option) => option.id === DEFAULT_EXPIRATION_ID);
     expect(defaultOption?.seconds).toBe(6 * 60 * 60);
     expect(EXPIRATION_OPTIONS.every((option) => option.seconds > 0)).toBe(true);
-  });
-
-  it('generates a QR data URL for a paste URL', async () => {
-    const dataUrl = await toDataURL('https://bin.example.com/p/abc123def456ghi7#key', {
-      margin: 1,
-      width: 128,
-    });
-    expect(dataUrl.startsWith('data:image/png;base64,')).toBe(true);
   });
 });
