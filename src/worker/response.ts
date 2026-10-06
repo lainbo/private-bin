@@ -16,7 +16,7 @@ const SECURITY_HEADERS = {
 
 function isLocalDevelopmentRequest(request: Request): boolean {
   const hostname = new URL(request.url).hostname;
-  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
 
 function applySecurityHeaders(headers: Headers, request?: Request): void {
@@ -55,7 +55,7 @@ export function errorResponse(error: unknown): Response {
   return jsonResponse({ message: '服务器暂时无法处理请求。' }, { status: 500 });
 }
 
-export async function assetResponse(response: Response, request?: Request): Promise<Response> {
+export function assetResponse(response: Response, request: Request): Response {
   const headers = new Headers(response.headers);
   applySecurityHeaders(headers, request);
   return new Response(response.body, {

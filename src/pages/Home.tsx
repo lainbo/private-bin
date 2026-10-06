@@ -105,7 +105,7 @@ export function Home({
   const [submitting, setSubmitting] = useState(false);
   const shareCardRef = useRef<HTMLElement | null>(null);
   const textSize = useMemo(() => utf8ByteLength(text), [text]);
-  const selectedExpiration = EXPIRATION_OPTIONS.find((option) => option.id === expirationId) ?? EXPIRATION_OPTIONS[4];
+  const selectedExpiration = EXPIRATION_OPTIONS.find((option) => option.id === expirationId)!;
 
   async function submitPaste() {
     if (submitting) return;

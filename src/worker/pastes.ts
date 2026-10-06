@@ -127,7 +127,7 @@ function rowToPaste(row: PasteRow, now: number): PasteResponse {
     burnAfterReading: row.burn_after_reading === 1,
     requiresPassword: row.requires_password === 1,
     textSize: row.text_size,
-    language: isPasteLanguage(row.language) ? row.language : 'text',
+    language: row.language,
     timeToLiveSeconds: Math.max(0, Math.floor((row.expires_at - now) / 1000)),
   };
 }

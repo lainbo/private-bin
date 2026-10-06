@@ -114,6 +114,10 @@ function setup(rows: PasteRow[]): AppEnv {
     ASSETS: {} as Fetcher,
     AUTH_RATE_LIMITER: { limit: async () => ({ success: true }) },
     CREATE_RATE_LIMITER: { limit: async () => ({ success: true }) },
+    ALLOW_PASSKEY_REGISTRATION: 'false',
+    PUBLIC_ORIGIN: 'https://bin.example.com',
+    RP_ID: 'bin.example.com',
+    SESSION_TTL_DAYS: '30',
   };
 }
 

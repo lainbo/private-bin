@@ -24,9 +24,9 @@ export function CodeViewer({ id, text, language }: { id: string; text: string; l
   const [highlighting, setHighlighting] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const canHighlight = language !== 'text' && utf8ByteLength(text) <= HIGHLIGHT_BYTE_LIMIT;
-  const languageLabel = LANGUAGE_OPTIONS.find((option) => option.id === language)?.label ?? '纯文本';
+  const languageLabel = LANGUAGE_OPTIONS.find((option) => option.id === language)!.label;
   const downloadName = useMemo(() => {
-    const extension = DOWNLOAD_EXTENSION_BY_LANGUAGE[language] ?? 'txt';
+    const extension = DOWNLOAD_EXTENSION_BY_LANGUAGE[language];
     return `private-bin-${id}.${extension}`;
   }, [id, language]);
 

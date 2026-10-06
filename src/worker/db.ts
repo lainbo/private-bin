@@ -1,4 +1,5 @@
 import type { ApiUser } from '../shared/api-types';
+import type { PasteLanguage } from '../shared/constants';
 import type { AppEnv } from './env';
 
 export type UserRow = {
@@ -44,7 +45,7 @@ export type PasteRow = {
   burn_after_reading: number;
   requires_password: number;
   text_size: number;
-  language: string;
+  language: PasteLanguage;
   created_at: number;
 };
 

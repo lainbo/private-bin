@@ -45,8 +45,7 @@ export const EXPIRATION_SECONDS = new Set<number>(
 );
 
 export function getDefaultExpirationSeconds(): number {
-  const option = EXPIRATION_OPTIONS.find((item) => item.id === DEFAULT_EXPIRATION_ID);
-  return option?.seconds ?? 6 * 60 * 60;
+  return EXPIRATION_OPTIONS.find((item) => item.id === DEFAULT_EXPIRATION_ID)!.seconds;
 }
 
 export function isPasteLanguage(value: string): value is PasteLanguage {

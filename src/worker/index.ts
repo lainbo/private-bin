@@ -70,7 +70,7 @@ export default {
       if (url.pathname.startsWith('/api/')) {
         return await handleApi(request, env);
       }
-      return await assetResponse(await env.ASSETS.fetch(request), request);
+      return assetResponse(await env.ASSETS.fetch(request), request);
     } catch (error) {
       return errorResponse(error);
     }

@@ -36,9 +36,7 @@ function isRegistrationOpen(env: AppEnv): boolean {
 }
 
 function sessionTtlMs(env: AppEnv): number {
-  const days = Number(env.SESSION_TTL_DAYS ?? '30');
-  const normalizedDays = Number.isFinite(days) && days > 0 ? days : 30;
-  return normalizedDays * 24 * 60 * 60 * 1000;
+  return Number(env.SESSION_TTL_DAYS) * 24 * 60 * 60 * 1000;
 }
 
 function originFor(request: Request, env: AppEnv): string {
