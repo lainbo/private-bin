@@ -184,6 +184,9 @@ export async function verifyRegister(env: AppEnv, request: Request): Promise<Res
     expectedOrigin: originFor(request, env),
     expectedRPID: rpIdFor(request, env),
     requireUserVerification: false,
+  }).catch((error: unknown) => {
+    console.error(error);
+    throw new HttpError(400, '注册响应无效。');
   });
   if (!verification.verified || !verification.registrationInfo) {
     throw new HttpError(400, 'Passkey 注册验证失败。');
@@ -236,7 +239,7 @@ export async function loginOptions(env: AppEnv, request: Request): Promise<Respo
 
 export async function verifyLogin(env: AppEnv, request: Request): Promise<Response> {
   const body = await readJson<{ challengeId?: string; response?: AuthenticationResponseJSON }>(request);
-  if (!body.challengeId || !body.response) throw new HttpError(400, '登录响应不完整。');
+  if (!body.challengeId || typeof body.response?.id !== 'string') throw new HttpError(400, '登录响应不完整。');
 
   const challenge = await env.DB.prepare(
     'DELETE FROM auth_challenges WHERE id = ? AND kind = ? RETURNING challenge, expires_at',
@@ -272,6 +275,9 @@ export async function verifyLogin(env: AppEnv, request: Request): Promise<Respon
     expectedRPID: rpIdFor(request, env),
     credential,
     requireUserVerification: false,
+  }).catch((error: unknown) => {
+    console.error(error);
+    throw new HttpError(400, '登录响应无效。');
   });
   if (!verification.verified) throw new HttpError(401, 'Passkey 登录验证失败。');
 
