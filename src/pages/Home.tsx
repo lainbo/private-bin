@@ -31,7 +31,7 @@ import {
   type PasteLanguage,
 } from '../shared/constants';
 import { createPaste } from '../lib/api';
-import { encryptPasteText, validateTextSize } from '../lib/paste-crypto';
+import { encryptPasteText } from '../lib/paste-crypto';
 import { formatBytes, formatDateTime } from '../lib/time';
 import { utf8ByteLength } from '../lib/encoding';
 import { errorMessage } from '../lib/ui';
@@ -113,19 +113,19 @@ export function Home({
     setMessage('');
     setCopied(false);
     try {
-      validateTextSize(text);
       const encrypted = await encryptPasteText({
         text,
         password,
         language,
         burnAfterReading,
       });
+      const { requiresPassword } = encrypted.crypto.aad;
       const response = await createPaste({
         ciphertext: encrypted.ciphertext,
         crypto: encrypted.crypto,
         expiresInSeconds: selectedExpiration.seconds,
         burnAfterReading,
-        requiresPassword: password.length > 0,
+        requiresPassword,
         textSize: encrypted.textSize,
         language,
       });
@@ -141,7 +141,7 @@ export function Home({
         qrDataUrl,
         expiresAt: response.expiresAt,
         burnAfterReading,
-        requiresPassword: password.length > 0,
+        requiresPassword,
       });
     } catch (error) {
       setMessage(errorMessage(error));
