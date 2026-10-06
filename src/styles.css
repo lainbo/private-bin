@@ -56,6 +56,7 @@
   :root {
     color-scheme: light;
     --header-height: 56px;
+    --footer-height: 40px;
   }
 
   html {
@@ -436,16 +437,9 @@
   }
 
   .brand-mark {
-    display: grid;
+    display: block;
     height: 28px;
     width: 28px;
-    place-items: center;
-    border-radius: 8px;
-    background: linear-gradient(160deg, #3f3f46 0%, #09090b 100%);
-    color: #fff;
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.16),
-      0 1px 2px rgb(24 24 27 / 0.24);
   }
 
   .user-chip {
@@ -475,9 +469,31 @@
     overflow: hidden;
   }
 
+  .app-footer {
+    display: flex;
+    height: var(--footer-height);
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .app-footer a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-muted);
+    font-size: 13px;
+    text-decoration: none;
+    transition: color 150ms ease;
+  }
+
+  .app-footer a:hover {
+    color: var(--color-ink);
+  }
+
   .page-loading {
     display: grid;
-    min-height: calc(100dvh - var(--header-height));
+    min-height: calc(100dvh - var(--header-height) - var(--footer-height));
     place-items: center;
     padding: 24px;
     color: var(--color-faint);
@@ -487,7 +503,7 @@
   .create-workspace {
     display: grid;
     width: 100%;
-    min-height: calc(100dvh - var(--header-height));
+    min-height: calc(100dvh - var(--header-height) - var(--footer-height));
     gap: 16px;
     padding: 20px 24px 24px;
   }
@@ -602,7 +618,7 @@
 
   .editor-form {
     display: grid;
-    min-height: calc(100dvh - var(--header-height) - 44px);
+    min-height: calc(100dvh - var(--header-height) - var(--footer-height) - 44px);
     overflow: hidden;
     grid-template-rows: minmax(0, 1fr) auto;
   }
@@ -795,7 +811,7 @@
 
   .notice-page {
     display: grid;
-    min-height: calc(100dvh - var(--header-height));
+    min-height: calc(100dvh - var(--header-height) - var(--footer-height));
     place-items: center;
     padding: 24px 16px;
   }
@@ -803,7 +819,7 @@
   /* ── Admin ── */
   .admin-page {
     display: grid;
-    min-height: calc(100dvh - var(--header-height));
+    min-height: calc(100dvh - var(--header-height) - var(--footer-height));
     padding: 32px 16px 48px;
   }
 
@@ -1092,7 +1108,7 @@
   }
 
   .create-sidebar {
-    max-height: calc(100dvh - var(--header-height) - 44px);
+    max-height: calc(100dvh - var(--header-height) - var(--footer-height) - 44px);
     overflow: auto;
   }
 }
