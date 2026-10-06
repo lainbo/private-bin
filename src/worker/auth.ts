@@ -331,7 +331,6 @@ export async function updateAdminUser(env: AppEnv, request: Request, userId: str
     if (auth.user.id === userId && body.disabled) {
       throw new HttpError(400, '不能停用当前登录的管理员。');
     }
-    if (body.disabled) await assertCanRemoveActiveAdmin(env, user);
     updates.push('disabled = ?');
     values.push(body.disabled ? 1 : 0);
   }

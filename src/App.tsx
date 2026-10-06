@@ -785,7 +785,7 @@ function AdminUserRow({
   }
 
   const canDelete = !isLastActiveAdmin;
-  const canDisable = !isCurrentUser && !(user.role === 'admin' && !user.disabled && isLastActiveAdmin);
+  const canDisable = !isCurrentUser;
 
   return (
     <div className="admin-user-row">
@@ -884,7 +884,7 @@ function AdminUserRow({
           className="btn btn-secondary btn-sm"
           type="button"
           disabled={busy || !canDisable}
-          title={canDisable ? undefined : '不能停用当前用户或最后一个管理员'}
+          title={canDisable ? undefined : '不能停用当前登录的管理员'}
           onClick={() => onToggleDisabled(user)}
         >
           {user.disabled ? '启用' : '停用'}
