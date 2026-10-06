@@ -30,7 +30,21 @@ const ID_RE = /^[a-z0-9]{16}$/u;
 const SALT_RE = base64urlPattern(SALT_BYTES);
 const IV_RE = base64urlPattern(IV_BYTES);
 const MAX_CIPHERTEXT_CHARS = 1_500_000;
-const MAX_CRYPTO_CHARS = 8_000;
+const CRYPTO_KEYS = [
+  'v',
+  'alg',
+  'kdf',
+  'iterations',
+  'memoryKiB',
+  'parallelism',
+  'salt',
+  'iv',
+  'tagLength',
+  'aad',
+] satisfies Array<keyof PasteCryptoSpec>;
+const AAD_KEYS = ['v', 'language', 'burnAfterReading', 'requiresPassword'] satisfies Array<
+  keyof PasteCryptoSpec['aad']
+>;
 
 export function configResponse(): Response {
   const payload: ConfigResponse = {
@@ -47,8 +61,14 @@ function validatePasteId(id: string): string {
   return id;
 }
 
+function hasExactKeys(value: object, keys: string[]): boolean {
+  return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+
 function parseCrypto(value: unknown): PasteCryptoSpec {
-  if (!value || typeof value !== 'object') throw new HttpError(400, '加密参数不正确。');
+  if (!value || typeof value !== 'object' || !hasExactKeys(value, CRYPTO_KEYS)) {
+    throw new HttpError(400, '加密参数不正确。');
+  }
   const spec = value as PasteCryptoSpec;
   if (
     spec.v !== 2 ||
@@ -63,6 +83,7 @@ function parseCrypto(value: unknown): PasteCryptoSpec {
     !IV_RE.test(spec.iv) ||
     spec.tagLength !== 128 ||
     !spec.aad ||
+    !hasExactKeys(spec.aad, AAD_KEYS) ||
     spec.aad.v !== 2 ||
     typeof spec.aad.burnAfterReading !== 'boolean' ||
     typeof spec.aad.requiresPassword !== 'boolean' ||
@@ -78,8 +99,6 @@ function validateCreatePaste(body: CreatePasteRequest): CreatePasteRequest {
     throw new HttpError(400, '密文大小不正确。');
   }
   const crypto = parseCrypto(body.crypto);
-  const cryptoLength = JSON.stringify(crypto).length;
-  if (cryptoLength > MAX_CRYPTO_CHARS) throw new HttpError(400, '加密参数过大。');
   if (!EXPIRATION_SECONDS.has(body.expiresInSeconds)) {
     throw new HttpError(400, '过期时间不正确。');
   }
