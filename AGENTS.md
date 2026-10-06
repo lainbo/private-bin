@@ -26,6 +26,8 @@
 - 包管理器：`pnpm`
 - 前端：React 19、TypeScript、Vite 8
 - React 插件：`@vitejs/plugin-react-oxc`
+- 样式：Tailwind CSS v4（`@tailwindcss/vite`）配合 `src/styles.css`
+- 编辑器：Monaco（`@monaco-editor/react`，桌面端懒加载；移动端使用原生 textarea），`monaco-editor` 通过 pnpm 补丁使用修复版 DOMPurify
 - Cloudflare：`@cloudflare/vite-plugin`、Wrangler、Workers Static Assets、D1
 - 测试：Vitest
 - 加密：浏览器 Web Crypto + WebAssembly，AES-GCM + Argon2id（64 MiB、4 次、并行度 5）
@@ -62,7 +64,7 @@
 - `migrations/0001_initial.sql`：D1 schema。
 - `wrangler.jsonc`：本地真实 Cloudflare Worker、Static Assets、D1、域名和公开环境变量配置，已在 `.gitignore` 中排除。
 - `wrangler.jsonc.example`：可提交的 Cloudflare 配置模板；新环境部署时复制为 `wrangler.jsonc` 后替换域名和 D1 ID。
-- `tests/paste-crypto.test.ts`：当前主要单元测试。
+- `tests/`：Vitest 测试，覆盖前端加密解密、paste 读取与阅后即焚、管理员用户操作和安全响应头。
 
 ## 本地开发
 
@@ -193,7 +195,7 @@ paste 记录中保存：
 
 ## 安全边界
 
-绝对不要读取、打印或提交真实敏感文件：
+以下真实敏感文件只在当前任务需要实际运行、连接或认证时读取：
 
 - `.env`
 - `.env.local`
@@ -210,9 +212,12 @@ paste 记录中保存：
 - `credentials.json`
 - `auth.json`
 
-如需了解环境变量，只能读取 `.env.example`、`.env.template`、`.env.sample` 等模板文件。
+使用要求：
 
-如果调试需要真实值，不要查找本地真实文件，向用户索取脱敏 mock 值。
+- 只了解变量名和格式时读取 `.env.example` 等模板文件，不搜索与任务无关的私密资料。
+- 通过环境变量、现有配置或程序直接加载真实值；终端、日志和回复只保留脱敏信息，不把秘密值拼进命令行。
+- 不把秘密值写入代码、文档或提交；示例使用环境变量引用或占位符。
+- 缺少必要配置时说明缺失项，不要求用户在对话中粘贴真实密钥，不把模拟结果当成真实验证通过。
 
 Cookie/session 约定：
 
@@ -287,7 +292,7 @@ fragment 不会发送到服务端。二维码只包含完整 URL，不包含查�
 ## 维护准则
 
 - 优先保持零知识模型和小而清晰的功能面。
-- 改认证、加密、删除、阅后即焚、过期清理逻辑前，先补测试或至少写清证据链。
+- 改认证、加密、删除、阅后即焚、过期清理逻辑前，先通过相关代码、调用关系、复现结果或现有测试取得直接证据；改动后运行现有测试，并在本地实际走一遍受影响的流程。
 - 不要把查看密码、明文、URL fragment key 发给 Worker。
 - 新增依赖前先确认 `pnpm-lock.yaml`，使用 `pnpm`。
 - 新增 Cloudflare binding 或 `vars` 后运行 `pnpm cf-types`。
