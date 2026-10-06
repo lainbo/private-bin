@@ -69,11 +69,6 @@ export async function getUserById(env: AppEnv, userId: string): Promise<UserRow 
   );
 }
 
-export async function countUsers(env: AppEnv): Promise<number> {
-  const row = await env.DB.prepare('SELECT COUNT(*) AS count FROM users').first<{ count: number }>();
-  return row?.count ?? 0;
-}
-
 export async function cleanupExpired(env: AppEnv, now = Date.now()): Promise<void> {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM sessions WHERE expires_at <= ?').bind(now),

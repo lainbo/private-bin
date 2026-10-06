@@ -18,7 +18,7 @@ import type {
 } from '../shared/api-types';
 import { base64urlToBytes, bytesToBase64url } from '../lib/base64url';
 import { clearSessionCookie, parseCookies, sessionCookie } from './cookies';
-import { countUsers, getUserById, toApiUser, type CredentialRow, type UserRow } from './db';
+import { getUserById, toApiUser, type CredentialRow, type UserRow } from './db';
 import type { AppEnv } from './env';
 import { HttpError, jsonResponse, readJson } from './response';
 import { randomId, sessionToken, sha256Base64url } from './crypto';
@@ -172,10 +172,10 @@ export async function verifyRegister(env: AppEnv, request: Request): Promise<Res
   const body = await readJson<{ challengeId?: string; response?: RegistrationResponseJSON }>(request);
   if (!body.challengeId || !body.response) throw new HttpError(400, '注册响应不完整。');
   const challenge = await env.DB.prepare(
-    'SELECT id, challenge, user_id, display_name, expires_at FROM auth_challenges WHERE id = ? AND kind = ?',
+    'DELETE FROM auth_challenges WHERE id = ? AND kind = ? RETURNING challenge, user_id, display_name, expires_at',
   )
     .bind(body.challengeId, 'registration')
-    .first<{ id: string; challenge: string; user_id: string; display_name: string; expires_at: number }>();
+    .first<{ challenge: string; user_id: string; display_name: string; expires_at: number }>();
   if (!challenge || challenge.expires_at <= Date.now()) throw new HttpError(400, '注册挑战已过期。');
 
   const verification = await verifyRegistrationResponse({
@@ -190,15 +190,14 @@ export async function verifyRegister(env: AppEnv, request: Request): Promise<Res
   }
 
   const now = Date.now();
-  const userCount = await countUsers(env);
-  const role = userCount === 0 ? 'admin' : 'user';
   const credential = verification.registrationInfo.credential;
   const transports = body.response.response.transports ?? [];
 
   await env.DB.batch([
     env.DB.prepare(
-      'INSERT INTO users (id, display_name, role, disabled, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)',
-    ).bind(challenge.user_id, challenge.display_name, role, now, now),
+      `INSERT INTO users (id, display_name, role, disabled, created_at, updated_at)
+       SELECT ?, ?, CASE WHEN EXISTS (SELECT 1 FROM users) THEN 'user' ELSE 'admin' END, 0, ?, ?`,
+    ).bind(challenge.user_id, challenge.display_name, now, now),
     env.DB.prepare(
       `INSERT INTO passkey_credentials
        (credential_id, user_id, public_key, counter, transports, credential_device_type, credential_backed_up, created_at, last_used_at)
@@ -214,7 +213,6 @@ export async function verifyRegister(env: AppEnv, request: Request): Promise<Res
       now,
       null,
     ),
-    env.DB.prepare('DELETE FROM auth_challenges WHERE id = ?').bind(challenge.id),
   ]);
 
   const headers = await createSession(env, challenge.user_id, request);
@@ -241,10 +239,10 @@ export async function verifyLogin(env: AppEnv, request: Request): Promise<Respon
   if (!body.challengeId || !body.response) throw new HttpError(400, '登录响应不完整。');
 
   const challenge = await env.DB.prepare(
-    'SELECT id, challenge, expires_at FROM auth_challenges WHERE id = ? AND kind = ?',
+    'DELETE FROM auth_challenges WHERE id = ? AND kind = ? RETURNING challenge, expires_at',
   )
     .bind(body.challengeId, 'authentication')
-    .first<{ id: string; challenge: string; expires_at: number }>();
+    .first<{ challenge: string; expires_at: number }>();
   if (!challenge || challenge.expires_at <= Date.now()) throw new HttpError(400, '登录挑战已过期。');
 
   const credentialRow = await env.DB.prepare(
@@ -278,14 +276,9 @@ export async function verifyLogin(env: AppEnv, request: Request): Promise<Respon
   if (!verification.verified) throw new HttpError(401, 'Passkey 登录验证失败。');
 
   const now = Date.now();
-  await env.DB.batch([
-    env.DB.prepare('UPDATE passkey_credentials SET counter = ?, last_used_at = ? WHERE credential_id = ?').bind(
-      verification.authenticationInfo.newCounter,
-      now,
-      credentialRow.credential_id,
-    ),
-    env.DB.prepare('DELETE FROM auth_challenges WHERE id = ?').bind(challenge.id),
-  ]);
+  await env.DB.prepare('UPDATE passkey_credentials SET counter = ?, last_used_at = ? WHERE credential_id = ?')
+    .bind(verification.authenticationInfo.newCounter, now, credentialRow.credential_id)
+    .run();
   const headers = await createSession(env, credentialRow.user_id, request);
   return jsonResponse({ verified: true }, { headers });
 }
