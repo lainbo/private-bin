@@ -138,12 +138,7 @@ export async function createPaste(env: AppEnv, request: Request): Promise<Respon
   const body = validateCreatePaste(await readJson<CreatePasteRequest>(request, 2 * 1024 * 1024));
   const now = Date.now();
   const expiresAt = now + body.expiresInSeconds * 1000;
-  let id = randomId(16);
-  for (let attempts = 0; attempts < 3; attempts += 1) {
-    const existing = await env.DB.prepare('SELECT id FROM pastes WHERE id = ?').bind(id).first();
-    if (!existing) break;
-    id = randomId(16);
-  }
+  const id = randomId(16);
 
   await env.DB.prepare(
     `INSERT INTO pastes
