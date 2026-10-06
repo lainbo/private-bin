@@ -1,21 +1,27 @@
 import { LogOut } from 'lucide-react';
 import type { AuthStatusResponse } from '../shared/api-types';
 import { logout } from '../lib/passkey';
-import { initialOf } from '../lib/ui';
+import { errorMessage, initialOf } from '../lib/ui';
 import type { Route } from '../routes';
 
 export function TopBar({
   status,
   refresh,
   setRoute,
+  showError,
 }: {
   status: AuthStatusResponse | null;
   refresh: () => Promise<void>;
   setRoute: (route: Route) => void;
+  showError: (message: string) => void;
 }) {
   async function submitLogout() {
-    await logout();
-    await refresh();
+    try {
+      await logout();
+      await refresh();
+    } catch (error) {
+      showError(errorMessage(error));
+    }
   }
 
   function navigateTo(routePath: string, nextRoute: Route) {

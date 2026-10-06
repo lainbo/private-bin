@@ -2,6 +2,7 @@ import { Check, Copy, Download } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { HIGHLIGHT_BYTE_LIMIT, LANGUAGE_OPTIONS, type PasteLanguage } from '../shared/constants';
 import { utf8ByteLength } from '../lib/encoding';
+import { useClipboardCopy } from '../lib/clipboard';
 
 const DOWNLOAD_EXTENSION_BY_LANGUAGE: Record<PasteLanguage, string> = {
   text: 'txt',
@@ -22,7 +23,7 @@ const DOWNLOAD_EXTENSION_BY_LANGUAGE: Record<PasteLanguage, string> = {
 export function CodeViewer({ id, text, language }: { id: string; text: string; language: PasteLanguage }) {
   const [html, setHtml] = useState('');
   const [highlighting, setHighlighting] = useState(false);
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const { copyState, copy } = useClipboardCopy();
   const canHighlight = useMemo(
     () => language !== 'text' && utf8ByteLength(text) <= HIGHLIGHT_BYTE_LIMIT,
     [language, text],
@@ -56,15 +57,6 @@ export function CodeViewer({ id, text, language }: { id: string; text: string; l
     };
   }, [canHighlight, language, text]);
 
-  async function copyText() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopyState('copied');
-    } catch {
-      setCopyState('failed');
-    }
-  }
-
   function downloadText() {
     const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
     const link = document.createElement('a');
@@ -89,7 +81,7 @@ export function CodeViewer({ id, text, language }: { id: string; text: string; l
             <Download size={15} />
             下载
           </button>
-          <button className="btn btn-ghost btn-sm" type="button" onClick={copyText}>
+          <button className="btn btn-ghost btn-sm" type="button" onClick={() => copy(text)}>
             {copyState === 'copied' ? <Check size={15} /> : <Copy size={15} />}
             {copyState === 'copied' ? '已复制' : copyState === 'failed' ? '复制失败' : '复制内容'}
           </button>

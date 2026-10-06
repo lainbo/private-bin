@@ -34,7 +34,7 @@ export default function App() {
 
   return (
     <div className={route.name === 'paste' ? 'app-shell app-shell--paste' : 'app-shell'}>
-      <TopBar status={status} refresh={refreshAuth} setRoute={setRoute} />
+      <TopBar status={status} refresh={refreshAuth} setRoute={setRoute} showError={setMessage} />
       {message ? <ErrorMessage className="mx-4 mt-4 sm:mx-6">{message}</ErrorMessage> : null}
       {route.name === 'paste' ? (
         <ViewPaste id={route.id} />

@@ -174,7 +174,7 @@ export async function getPaste(env: AppEnv, id: string): Promise<Response> {
   const row = rows[0];
   if (!row || row.expires_at <= now) throw new HttpError(404, 'Paste 不存在、已过期或已删除。');
   if (row.burn_after_reading === 1) {
-    throw new HttpError(409, '这个 Paste 需要确认后才能打开。');
+    throw new HttpError(409, '这是阅后即焚 Paste，请使用创建者分享的完整链接打开。');
   }
   return jsonResponse(rowToPaste(row, now));
 }

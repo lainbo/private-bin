@@ -34,6 +34,7 @@ import { createPaste } from '../lib/api';
 import { encryptPasteText } from '../lib/paste-crypto';
 import { formatBytes, formatDateTime } from '../lib/time';
 import { utf8ByteLength } from '../lib/encoding';
+import { useClipboardCopy } from '../lib/clipboard';
 import { errorMessage } from '../lib/ui';
 import { AuthGate } from '../components/AuthGate';
 import { ErrorMessage } from '../components/ErrorMessage';
@@ -101,7 +102,7 @@ export function Home({
   const [showPassword, setShowPassword] = useState(false);
   const [created, setCreated] = useState<CreatedPaste | null>(null);
   const [message, setMessage] = useState('');
-  const [copied, setCopied] = useState(false);
+  const { copyState, copy, resetCopyState } = useClipboardCopy();
   const [submitting, setSubmitting] = useState(false);
   const shareCardRef = useRef<HTMLElement | null>(null);
   const textSize = useMemo(() => utf8ByteLength(text), [text]);
@@ -111,7 +112,7 @@ export function Home({
     if (submitting) return;
     setSubmitting(true);
     setMessage('');
-    setCopied(false);
+    resetCopyState();
     try {
       const encrypted = await encryptPasteText({
         text,
@@ -153,12 +154,6 @@ export function Home({
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     void submitPaste();
-  }
-
-  async function copyLink() {
-    if (!created) return;
-    await navigator.clipboard.writeText(created.url);
-    setCopied(true);
   }
 
   const updateText = useCallback((value: string | undefined) => {
@@ -322,9 +317,9 @@ export function Home({
               <div className="share-url" title={created.url}>
                 {created.url}
               </div>
-              <button className="btn btn-primary w-full" type="button" onClick={copyLink}>
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-                {copied ? '已复制' : '复制链接'}
+              <button className="btn btn-primary w-full" type="button" onClick={() => copy(created.url)}>
+                {copyState === 'copied' ? <Check size={16} /> : <Copy size={16} />}
+                {copyState === 'copied' ? '已复制' : copyState === 'failed' ? '复制失败' : '复制链接'}
               </button>
               <dl className="meta-list">
                 <div>
