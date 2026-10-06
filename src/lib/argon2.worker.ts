@@ -10,7 +10,7 @@ type Argon2WorkerRequest = {
   parallelism: number;
 };
 
-const worker = globalThis as unknown as DedicatedWorkerGlobalScope;
+const worker = self as unknown as DedicatedWorkerGlobalScope;
 
 worker.onmessage = async (event: MessageEvent<Argon2WorkerRequest>) => {
   try {

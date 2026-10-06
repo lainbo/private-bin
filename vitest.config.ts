@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'node',
+    setupFiles: ['@vitest/web-worker'],
     coverage: {
       provider: 'v8',
       reporter: ['text'],
