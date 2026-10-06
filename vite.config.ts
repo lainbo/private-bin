@@ -6,7 +6,6 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [tailwindcss(), react(), cloudflare()],
   build: {
-    minify: 'esbuild',
     sourcemap: true,
   },
 });
