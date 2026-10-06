@@ -1,12 +1,15 @@
 import { bytesToBase64url, randomBase64url } from '../lib/base64url';
 
-export function randomId(length = 16): string {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
+const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+// 只使用小于 252（36 的整数倍）的字节，取模后每个字符出现的概率相同
+const UNBIASED_BYTE_LIMIT = 256 - (256 % ID_ALPHABET.length);
+
+export function randomId(length: number): string {
   let id = '';
-  for (const byte of bytes) {
-    id += alphabet[byte % alphabet.length];
+  while (id.length < length) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(length))) {
+      if (byte < UNBIASED_BYTE_LIMIT && id.length < length) id += ID_ALPHABET[byte % ID_ALPHABET.length];
+    }
   }
   return id;
 }
