@@ -3,16 +3,11 @@ import type {
   AdminUpdateUserRequest,
   AdminUserResponse,
   AuthStatusResponse,
-  ConfigResponse,
   CreatePasteRequest,
   CreatePasteResponse,
   PasteResponse,
 } from '../shared/api-types';
 import { apiFetch } from './http';
-
-export function getConfig(): Promise<ConfigResponse> {
-  return apiFetch<ConfigResponse>('/api/config');
-}
 
 export function getAuthStatus(): Promise<AuthStatusResponse> {
   return apiFetch<AuthStatusResponse>('/api/auth/status');
@@ -33,12 +28,6 @@ export function consumePaste(id: string): Promise<PasteResponse> {
   return apiFetch<PasteResponse>(`/api/pastes/${encodeURIComponent(id)}/consume`, {
     method: 'POST',
     body: '{}',
-  });
-}
-
-export function deletePaste(id: string): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>(`/api/pastes/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
   });
 }
 

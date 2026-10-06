@@ -1,5 +1,3 @@
-export const APP_NAME = 'Private Bin';
-
 export const MAX_TEXT_BYTES = 1_000_000;
 export const HIGHLIGHT_BYTE_LIMIT = 250_000;
 
@@ -49,10 +47,6 @@ export const EXPIRATION_SECONDS = new Set<number>(
 export function getDefaultExpirationSeconds(): number {
   const option = EXPIRATION_OPTIONS.find((item) => item.id === DEFAULT_EXPIRATION_ID);
   return option?.seconds ?? 6 * 60 * 60;
-}
-
-export function getExpirationLabel(seconds: number): string {
-  return EXPIRATION_OPTIONS.find((option) => option.seconds === seconds)?.label ?? '6 小时';
 }
 
 export function isPasteLanguage(value: string): value is PasteLanguage {

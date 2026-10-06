@@ -97,7 +97,6 @@ function pasteRow(options: { id: string; burn: boolean; expiresAt?: number }): P
   return {
     id: options.id,
     owner_user_id: 'owner',
-    version: 2,
     ciphertext: 'ciphertext',
     crypto: JSON.stringify(spec),
     expires_at: options.expiresAt ?? Date.now() + 60_000,

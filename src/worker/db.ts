@@ -38,7 +38,6 @@ export type ChallengeRow = {
 export type PasteRow = {
   id: string;
   owner_user_id: string;
-  version: number;
   ciphertext: string;
   crypto: string;
   expires_at: number;
