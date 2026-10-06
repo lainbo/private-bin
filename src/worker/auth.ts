@@ -170,7 +170,9 @@ export async function registerOptions(env: AppEnv, request: Request): Promise<Re
 export async function verifyRegister(env: AppEnv, request: Request): Promise<Response> {
   if (!isRegistrationOpen(env)) throw new HttpError(403, '注册暂未开放。');
   const body = await readJson<{ challengeId?: string; response?: RegistrationResponseJSON }>(request);
-  if (!body.challengeId || !body.response) throw new HttpError(400, '注册响应不完整。');
+  if (!body.challengeId || typeof body.challengeId !== 'string' || !body.response) {
+    throw new HttpError(400, '注册响应不完整。');
+  }
   const challenge = await env.DB.prepare(
     'DELETE FROM auth_challenges WHERE id = ? AND kind = ? RETURNING challenge, user_id, display_name, expires_at',
   )
@@ -239,7 +241,9 @@ export async function loginOptions(env: AppEnv, request: Request): Promise<Respo
 
 export async function verifyLogin(env: AppEnv, request: Request): Promise<Response> {
   const body = await readJson<{ challengeId?: string; response?: AuthenticationResponseJSON }>(request);
-  if (!body.challengeId || typeof body.response?.id !== 'string') throw new HttpError(400, '登录响应不完整。');
+  if (!body.challengeId || typeof body.challengeId !== 'string' || typeof body.response?.id !== 'string') {
+    throw new HttpError(400, '登录响应不完整。');
+  }
 
   const challenge = await env.DB.prepare(
     'DELETE FROM auth_challenges WHERE id = ? AND kind = ? RETURNING challenge, expires_at',
