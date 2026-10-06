@@ -945,6 +945,8 @@ function ViewPaste({ id }: { id: string }) {
             crypto: response.crypto,
             key: pasteKey,
             password: '',
+          }).catch(() => {
+            throw new Error('无法解密。请确认链接是否完整。');
           });
           if (!cancelled) setPlainText(text);
         }
